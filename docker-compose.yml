@@ -1,0 +1,15 @@
+version: '2'
+services:
+  dspsr:
+    build: .
+    container_name: dspsr
+    volumes:
+     - .:/data/
+     - "/var/run/docker.sock:/var/run/docker.sock"
+    hostname: localhost
+    expose:
+     - "22"
+    ports:
+     - "2224:22/tcp"
+    image: "mpifrpsr/dspsr"
+    command: "/usr/sbin/sshd -D"
