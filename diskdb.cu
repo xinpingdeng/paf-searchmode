@@ -17,7 +17,7 @@ int init_diskdb(char conf_fname[MSTR_LEN], conf_t *conf)
   conf->fp = fopen(conf->fname, "r");
   if(conf->fp == NULL)
     {
-      fprintf(stderr, "Can not open file :s, which happens at \"%s\", line [%d].\n", conf->fname, __FILE__, __LINE__);
+      fprintf(stderr, "Can not open file: %s, which happens at \"%s\", line [%d].\n", conf->fname, __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
   

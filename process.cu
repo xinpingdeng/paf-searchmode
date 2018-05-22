@@ -26,8 +26,8 @@ int init_process(conf_t *conf)
   ipcbuf_t *db = NULL;
   
   /* Prepare buffer, stream and fft plan for process */
-  conf->scl_ndim    = conf->rbufin_ndfstp * NSAMP_DF * NPOL_SAMP * NDIM_POL;
-  conf->nsamp1      = conf->stream_ndfstp * NCHK_NIC * NCHAN_CHK * NSAMP_DF;
+  conf->scl_ndim    = conf->rbufin_ndf * NSAMP_DF * NPOL_SAMP * NDIM_POL;
+  conf->nsamp1      = conf->stream_ndf * NCHK_NIC * NCHAN_CHK * NSAMP_DF;
   conf->npol1       = conf->nsamp1 * NPOL_SAMP;
   conf->ndata1      = conf->npol1  * NDIM_POL;
 
@@ -108,7 +108,7 @@ int init_process(conf_t *conf)
   CudaSafeCall(cudaMalloc((void **)&conf->buf_rt2, conf->bufrt2_size)); 
 
   /* Prepare the setup of kernels */
-  conf->gridsize_unpack.x = conf->stream_ndfstp;
+  conf->gridsize_unpack.x = conf->stream_ndf;
   conf->gridsize_unpack.y = NCHK_NIC;
   conf->gridsize_unpack.z = 1;
   conf->blocksize_unpack.x = NSAMP_DF; 
@@ -116,20 +116,20 @@ int init_process(conf_t *conf)
   conf->blocksize_unpack.z = 1;
   
   conf->gridsize_swap_select_transpose.x = NCHK_NIC * NCHAN_CHK;
-  conf->gridsize_swap_select_transpose.y = conf->stream_ndfstp * NSAMP_DF / CUFFT_NX1;
+  conf->gridsize_swap_select_transpose.y = conf->stream_ndf * NSAMP_DF / CUFFT_NX1;
   conf->gridsize_swap_select_transpose.z = 1;  
   conf->blocksize_swap_select_transpose.x = CUFFT_NX1;
   conf->blocksize_swap_select_transpose.y = 1;
   conf->blocksize_swap_select_transpose.z = 1;
 
   conf->gridsize_swap_select_transpose_swap.x = NCHK_NIC * NCHAN_CHK;
-  conf->gridsize_swap_select_transpose_swap.y = conf->stream_ndfstp * NSAMP_DF / CUFFT_NX1;
+  conf->gridsize_swap_select_transpose_swap.y = conf->stream_ndf * NSAMP_DF / CUFFT_NX1;
   conf->gridsize_swap_select_transpose_swap.z = 1;  
   conf->blocksize_swap_select_transpose_swap.x = CUFFT_NX1;
   conf->blocksize_swap_select_transpose_swap.y = 1;
   conf->blocksize_swap_select_transpose_swap.z = 1;
       
-  conf->gridsize_swap.x = conf->stream_ndfstp * NSAMP_DF / CUFFT_NX1; 
+  conf->gridsize_swap.x = conf->stream_ndf * NSAMP_DF / CUFFT_NX1; 
   conf->gridsize_swap.y = NCHAN_FINAL;
   conf->gridsize_swap.z = 1;
   conf->blocksize_swap.x = CUFFT_NX2;
@@ -150,14 +150,14 @@ int init_process(conf_t *conf)
   conf->blocksize_scale.y = 1;
   conf->blocksize_scale.z = 1;
   
-  conf->gridsize_transpose_scale.x = conf->stream_ndfstp * NSAMP_DF / CUFFT_NX1; 
+  conf->gridsize_transpose_scale.x = conf->stream_ndf * NSAMP_DF / CUFFT_NX1; 
   conf->gridsize_transpose_scale.y = NCHAN_FINAL;
   conf->gridsize_transpose_scale.z = 1;
   conf->blocksize_transpose_scale.x = CUFFT_NX2;
   conf->blocksize_transpose_scale.y = 1;
   conf->blocksize_transpose_scale.z = 1;
   
-  conf->gridsize_transpose_pad.x = conf->stream_ndfstp * NSAMP_DF / CUFFT_NX1; 
+  conf->gridsize_transpose_pad.x = conf->stream_ndf * NSAMP_DF / CUFFT_NX1; 
   conf->gridsize_transpose_pad.y = NCHAN_FINAL;
   conf->gridsize_transpose_pad.z = 1;
   conf->blocksize_transpose_pad.x = CUFFT_NX2;
@@ -165,7 +165,7 @@ int init_process(conf_t *conf)
   conf->blocksize_transpose_pad.z = 1;
 
   conf->gridsize_sum1.x = NCHAN_FINAL;
-  conf->gridsize_sum1.y = conf->stream_ndfstp * NPOL_SAMP;
+  conf->gridsize_sum1.y = conf->stream_ndf * NPOL_SAMP;
   conf->gridsize_sum1.z = 1;
   conf->blocksize_sum1.x = NSAMP_DF / 2;
   conf->blocksize_sum1.y = 1;
@@ -174,32 +174,32 @@ int init_process(conf_t *conf)
   conf->gridsize_sum2.x = NCHAN_FINAL;
   conf->gridsize_sum2.y = 1;
   conf->gridsize_sum2.z = 1;
-  conf->blocksize_sum2.x = conf->stream_ndfstp * NPOL_SAMP / 2;
+  conf->blocksize_sum2.x = conf->stream_ndf * NPOL_SAMP / 2;
   conf->blocksize_sum2.y = 1;
   conf->blocksize_sum2.z = 1;
   
-  conf->gridsize_transpose_scale2.x = conf->stream_ndfstp * NSAMP_DF / CUFFT_NX1; 
+  conf->gridsize_transpose_scale2.x = conf->stream_ndf * NSAMP_DF / CUFFT_NX1; 
   conf->gridsize_transpose_scale2.y = 1;
   conf->gridsize_transpose_scale2.z = 1;
   conf->blocksize_transpose_scale2.x = CUFFT_NX2;
   conf->blocksize_transpose_scale2.y = CUFFT_NX2;
   conf->blocksize_transpose_scale2.z = 1;
   
-  conf->gridsize_transpose_scale3.x = conf->stream_ndfstp * NSAMP_DF / CUFFT_NX1; 
+  conf->gridsize_transpose_scale3.x = conf->stream_ndf * NSAMP_DF / CUFFT_NX1; 
   conf->gridsize_transpose_scale3.y = NCHAN_FINAL / TILE_DIM;
   conf->gridsize_transpose_scale3.z = 1;
   conf->blocksize_transpose_scale3.x = TILE_DIM;
   conf->blocksize_transpose_scale3.y = NROWBLOCK_TRANS;
   conf->blocksize_transpose_scale3.z = 1;
   
-  conf->gridsize_transpose_scale4.x = conf->stream_ndfstp * NSAMP_DF / CUFFT_NX1; 
+  conf->gridsize_transpose_scale4.x = conf->stream_ndf * NSAMP_DF / CUFFT_NX1; 
   conf->gridsize_transpose_scale4.y = NCHAN_FINAL / TILE_DIM;
   conf->gridsize_transpose_scale4.z = 1;
   conf->blocksize_transpose_scale4.x = TILE_DIM;
   conf->blocksize_transpose_scale4.y = NROWBLOCK_TRANS;
   conf->blocksize_transpose_scale4.z = 1;
   
-  conf->gridsize_transpose_float.x = conf->stream_ndfstp * NSAMP_DF / CUFFT_NX1; 
+  conf->gridsize_transpose_float.x = conf->stream_ndf * NSAMP_DF / CUFFT_NX1; 
   conf->gridsize_transpose_float.y = NCHAN_FINAL / TILE_DIM;
   conf->gridsize_transpose_float.z = 1;
   conf->blocksize_transpose_float.x = TILE_DIM;
@@ -366,7 +366,7 @@ int do_process(conf_t conf)
 #ifdef DEBUG
 	  clock_gettime(CLOCK_REALTIME, &stop);
 	  elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1000000000.0L;
-	  fprintf(stdout, "elapsed time to read %d data frame steps is %f s\n", conf.stream_ndfstp * conf.nstream, elapsed_time);
+	  fprintf(stdout, "elapsed time to read %d data frame steps is %f s\n", conf.stream_ndf * conf.nstream, elapsed_time);
 #endif
 	  
 #ifdef DEBUG
@@ -396,7 +396,7 @@ int do_process(conf_t conf)
 #ifdef DEBUG
 	      clock_gettime(CLOCK_REALTIME, &stop);
 	      elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1000000000.0L;
-	      fprintf(stdout, "elapsed time to memcpy %d data frame steps is %f s\n", conf.stream_ndfstp, elapsed_time);
+	      fprintf(stdout, "elapsed time to memcpy %d data frame steps is %f s\n", conf.stream_ndf, elapsed_time);
 #endif
 	      
 	      /* Unpack raw data into cufftComplex array */
@@ -427,7 +427,7 @@ int do_process(conf_t conf)
 	  CudaSafeCall(cudaEventRecord(stop_event));
 	  CudaSafeCall(cudaEventSynchronize(stop_event));
 	  CudaSafeCall(cudaEventElapsedTime(&elapsed_event, start_event, stop_event));
-	  fprintf(stdout, "elapsed time for GPU process of %d data frame steps is %f s\n", conf.stream_ndfstp * conf.nstream, elapsed_event/1.0E3);
+	  fprintf(stdout, "elapsed time for GPU process of %d data frame steps is %f s\n", conf.stream_ndf * conf.nstream, elapsed_event/1.0E3);
 #endif
 	}
       
@@ -447,7 +447,7 @@ int do_process(conf_t conf)
 #ifdef DEBUG
       clock_gettime(CLOCK_REALTIME, &stop);
       elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1000000000.0L;
-      fprintf(stdout, "elapsed time to write %d data frame steps is %f s\n\n", conf.rbufin_ndfstp , elapsed_time);
+      fprintf(stdout, "elapsed time to write %d data frame steps is %f s\n\n", conf.rbufin_ndf , elapsed_time);
 #endif
 #ifdef DEBUG
       clock_gettime(CLOCK_REALTIME, &start);
@@ -662,17 +662,7 @@ int register_header(conf_t *conf)
       return EXIT_FAILURE;
     }
   
-  if(conf->debug)
-    {
-      memcpy(conf->hdrbuf_out, conf->hdrbuf_in, DADA_HDR_SIZE);
-      if (ascii_header_get(conf->hdrbuf_in, "UTC_START", "%s", conf->utc_start) < 0)  
-	{
-	  multilog(runtime_log, LOG_ERR, "failed ascii_header_get UTC_START\n");
-	  fprintf(stderr, "Error getting UTC_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	  return EXIT_FAILURE;
-	}
-    }  
-  else
+  if(conf->stream)
     {
       if (fileread(conf->hfname, conf->hdrbuf_out, DADA_HDR_SIZE) < 0)
 	{
@@ -729,6 +719,16 @@ int register_header(conf_t *conf)
 	  return EXIT_FAILURE;
 	}
     }
+  else
+    {
+      memcpy(conf->hdrbuf_out, conf->hdrbuf_in, DADA_HDR_SIZE);
+      if (ascii_header_get(conf->hdrbuf_in, "UTC_START", "%s", conf->utc_start) < 0)  
+	{
+	  multilog(runtime_log, LOG_ERR, "failed ascii_header_get UTC_START\n");
+	  fprintf(stderr, "Error getting UTC_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	  return EXIT_FAILURE;
+	}
+    }  
   
   if(ipcbuf_mark_cleared (conf->hdu_in->header_block))  // We are the only one reader, so that we can clear it after read;
     {

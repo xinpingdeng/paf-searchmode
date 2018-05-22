@@ -13,6 +13,27 @@
 #include "process.cuh"
 #include "cudautil.cuh"
 
+
+void usage ()
+{
+  fprintf (stdout,
+	   "paf_process - Pre-process PAF BMF raw data or DADA format file for dspsr \n"
+	   "\n"
+	   "Usage: paf_process [options]\n"
+	   " -a  Hexacdecimal shared memory key for incoming ring buffer\n"
+	   " -b  Hexacdecimal shared memory key for outcoming ring buffer\n"
+	   " -c  The number of data frame steps of each incoming ring buffer block\n"
+	   " -d  How many times we need to repeat the process and finish one incoming block\n"
+	   " -e  The number of streams \n"
+	   " -f  The number of data stream steps of each stream\n"
+	   " -g  Enable start-of-data or not\n"
+	   " -h  show help\n"
+	   " -i  The index of GPU\n"
+	   " -j  The name of DADA header template\n"
+	   " -k  The directory for data recording\n"
+	   " -l  The source of fold data, stream or files\n");
+}
+
 multilog_t *runtime_log;
 
 int main(int argc, char *argv[])
@@ -20,79 +41,92 @@ int main(int argc, char *argv[])
   int arg;
   conf_t conf;
   FILE *fp_log = NULL;
+  char log_fname[MSTR_LEN], hfname[MSTR_LEN];
   
+  /* Initial part */  
+  while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:")) != -1)
+    {
+      switch(arg)
+	{
+	case 'h':
+	  usage();
+	  return EXIT_SUCCESS;
+	  
+	case 'a':	  
+	  if (sscanf (optarg, "%x", &conf.key_in) != 1)
+	    {
+	      //multilog (runtime_log, LOG_ERR, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
+	      fprintf (stderr, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
+	      return EXIT_FAILURE;
+	    }
+	  break;
+	  
+	case 'b':	  
+	  if (sscanf (optarg, "%x", &conf.key_out) != 1)
+	    {
+	      //multilog (runtime_log, LOG_ERR, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
+	      fprintf (stderr, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
+	      return EXIT_FAILURE;
+	    }
+	  break;
+	  	  
+	case 'c':
+	  sscanf(optarg, "%lf", &conf.rbufin_ndf);
+	  break;
+	  
+	case 'd':
+	  sscanf(optarg, "%d", &conf.nrun_blk);
+	  break;
+	  
+	case 'e':
+	  sscanf(optarg, "%d", &conf.nstream);
+	  break;
+	  
+	case 'f':
+	  sscanf(optarg, "%d", &conf.stream_ndf);
+	  break;
+	  	  
+	case 'g':
+	  sscanf(optarg, "%d", &conf.sod);
+	  break;
+	  
+	case 'i':
+	  sscanf(optarg, "%d", &conf.device_id);
+	  break;
+
+	case 'j':	  	  
+	  sscanf(optarg, "%s", hfname);
+	  break;
+
+	case 'k':
+	  sscanf(optarg, "%s", conf.dir);
+	  break;
+	  
+	case 'l':
+	  sscanf(optarg, "%d", &conf.stream);
+	  break;	  
+	}
+    }
+  sprintf(conf.hfname, "%s/%s", conf.dir, hfname);
+
   /* Setup log interface */
-  fp_log = fopen("paf_process.log", "ab+");
+  sprintf(log_fname, "%s/paf_process.log", conf.dir);
+  fp_log = fopen(log_fname, "ab+");
   if(fp_log == NULL)
     {
-      fprintf(stderr, "Can not open log file paf_process.log\n");
+      fprintf(stderr, "Can not open log file %s\n", log_fname);
       return EXIT_FAILURE;
     }
   runtime_log = multilog_open("paf_process", 1);
   multilog_add(runtime_log, fp_log);
   multilog(runtime_log, LOG_INFO, "START PAF_PROCESS\n");
-  
-  /* Initial part */  
-  while((arg=getopt(argc,argv,"c:o:i:d:s:h:n:p:r:g:f:b:")) != -1)
-    {
-      switch(arg)
-	{	  
-	case 'h':	  	  
-	  sscanf(optarg, "%s", conf.hfname);
-	  break;
 
-	case 'c':
-	  sscanf(optarg, "%lf", &conf.rbufin_ndfstp);
-	  break;
-	  
-	case 's':
-	  sscanf(optarg, "%d", &conf.sod);
-	  break;
-	  
-	case 'o':	  
-	  if (sscanf (optarg, "%x", &conf.key_out) != 1)
-	    {
-	      multilog (runtime_log, LOG_ERR, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
-	      fprintf (stderr, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
-	      return EXIT_FAILURE;
-	    }
-	  break;
-	  
-	case 'i':	  
-	  if (sscanf (optarg, "%x", &conf.key_in) != 1)
-	    {
-	      multilog (runtime_log, LOG_ERR, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
-	      fprintf (stderr, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
-	      return EXIT_FAILURE;
-	    }
-	  break;
-	  
-	case 'd':
-	  sscanf(optarg, "%d", &conf.device_id);
-	  break;
+  /* Here to make sure that if we only expose one GPU into docker container, we can get the right index of it */ 
+  int deviceCount;
+  CudaSafeCall(cudaGetDeviceCount(&deviceCount));
+  if(deviceCount == 1)
+    conf.device_id = 0;
 
-	case 'n':
-	  sscanf(optarg, "%d", &conf.nstream);
-	  break;
-	  
-	case 'p':
-	  sscanf(optarg, "%d", &conf.stream_ndfstp);
-	  break;
-	  
-	case 'g':
-	  sscanf(optarg, "%d", &conf.debug);
-	  break;
-	  
-	case 'f':
-	  sscanf(optarg, "%s", conf.dir);
-	  break;
-	  
-	case 'b':
-	  sscanf(optarg, "%d", &conf.nrun_blk);
-	  break;	  
-	}
-    }
-  
 #ifdef DEBUG
   struct timespec start, stop;
   double elapsed_time;
@@ -104,7 +138,7 @@ int main(int argc, char *argv[])
       elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1000000000.0L;
       fprintf(stdout, "elapsed time for processing prepare is %f s\n\n\n\n\n", elapsed_time);
 #endif
-      
+  
   /* Check on-board gpus */
 //#ifdef DEBUG
 //  int deviceCount, device;

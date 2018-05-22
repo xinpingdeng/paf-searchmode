@@ -13,3 +13,4 @@ debug = args.debug[0]
 #os.system("ipcrm -a")
 os.system("make clean")
 os.system("make DEBUG={:d}".format(debug))
+os.system("make clean")

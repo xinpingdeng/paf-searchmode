@@ -88,7 +88,7 @@ int check_connection(sock_t *sock, int *active_ports, int *active_chunks)
 	  if (recv(sock[i].sock, (void *)df, DF_SIZE, 0) < 0)
 	    // If the size is -1, means we get time out and the port is not active
 	    {
-	      multilog(runtime_log, LOG_INFO, "Can not receive data from %s:%d, which happens at \"%s\", line [%d].\n", inet_ntoa(sock[i].sa.sin_addr), ntohs(sock[i].sa.sin_port), __FILE__, __LINE__);
+	      multilog(runtime_log, LOG_ERR, "Can not receive data from %s:%d, which happens at \"%s\", line [%d].\n", inet_ntoa(sock[i].sa.sin_addr), ntohs(sock[i].sa.sin_port), __FILE__, __LINE__);
 	      fprintf (stderr, "Can not receive data from %s:%d, which happens at \"%s\", line [%d].\n", inet_ntoa(sock[i].sa.sin_addr), ntohs(sock[i].sa.sin_port), __FILE__, __LINE__);
 	      sock[i].active = 0;
 	      (*active_ports)--;
@@ -101,7 +101,7 @@ int check_connection(sock_t *sock, int *active_ports, int *active_chunks)
 	      
 	      if(freq==0)    // Frequency can not be zero
 		{
-		  multilog(runtime_log, LOG_INFO, "The data received on %s:%d is not right, which happens at \"%s\", line [%d].\n", inet_ntoa(sock[i].sa.sin_addr), ntohs(sock[i].sa.sin_port), __FILE__, __LINE__);
+		  multilog(runtime_log, LOG_ERR, "The data received on %s:%d is not right, which happens at \"%s\", line [%d].\n", inet_ntoa(sock[i].sa.sin_addr), ntohs(sock[i].sa.sin_port), __FILE__, __LINE__);
 		  fprintf (stderr, "The data received on %s:%d is not right, which happens at \"%s\", line [%d].\n", inet_ntoa(sock[i].sa.sin_addr), ntohs(sock[i].sa.sin_port), __FILE__, __LINE__);
 		  return EXIT_FAILURE;
 		}
@@ -164,7 +164,7 @@ int init_sockets(sock_t *sock, char *ip, int *ports)
       
       if (-1 == bind(sock[i].sock, (struct sockaddr *)&sock[i].sa, sizeof(sock[i].sa)))
 	{
-	  multilog(runtime_log, LOG_INFO, "Bind to %s:%d failed, which happens at \"%s\", line [%d].\n", inet_ntoa(sock[i].sa.sin_addr), ntohs(sock[i].sa.sin_port), __FILE__, __LINE__);
+	  multilog(runtime_log, LOG_ERR, "Bind to %s:%d failed, which happens at \"%s\", line [%d].\n", inet_ntoa(sock[i].sa.sin_addr), ntohs(sock[i].sa.sin_port), __FILE__, __LINE__);
 	  fprintf (stderr, "Bind to %s:%d failed, which happens at \"%s\", line [%d].\n", inet_ntoa(sock[i].sa.sin_addr), ntohs(sock[i].sa.sin_port), __FILE__, __LINE__);
 	  close(sock[i].sock);
 	  sock[i].active = 0;
@@ -232,7 +232,7 @@ int init_capture(conf_t *conf, char *ip, int *ports)
   
   if(init_rbuf(conf) == EXIT_FAILURE)
     {
-      multilog(runtime_log, LOG_INFO, "Can not initialise ring buffer, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      multilog(runtime_log, LOG_ERR, "Can not initialise ring buffer, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       fprintf(stderr, "Can not initialise ring buffer, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
@@ -246,7 +246,7 @@ int init_capture(conf_t *conf, char *ip, int *ports)
   /* Initialise sockets */
   if(init_sockets(conf->sock, ip, ports) == EXIT_FAILURE)
     {
-      multilog(runtime_log, LOG_INFO, "Can not initialise sockets, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      multilog(runtime_log, LOG_ERR, "Can not initialise sockets, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       fprintf (stderr, "Can not initialise sockets, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
@@ -254,7 +254,7 @@ int init_capture(conf_t *conf, char *ip, int *ports)
   /* Check the available ports and frequency chunks */
   if(check_connection(conf->sock, &active_ports, &active_chunks) == EXIT_FAILURE)
     {
-      multilog(runtime_log, LOG_INFO, "Can not check the connection, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      multilog(runtime_log, LOG_ERR, "Can not check the connection, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       fprintf (stderr, "Can not check the connection, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }  
@@ -264,7 +264,7 @@ int init_capture(conf_t *conf, char *ip, int *ports)
   /* Align data frames from different sockets, which will make futhre work easier */
   if(align_df(conf->sock, active_ports) == EXIT_FAILURE)
     {
-      multilog(runtime_log, LOG_INFO, "Can not align data frames, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      multilog(runtime_log, LOG_ERR, "Can not align data frames, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       fprintf (stderr, "Can not align data frames, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE; 
     }
@@ -306,7 +306,7 @@ int init_capture(conf_t *conf, char *ip, int *ports)
   acquire_start_time(conf->sock[i].hdr_start, conf->efname, conf->utc_start, &(conf->picoseconds));
   if(register_header(conf))
     {
-      multilog(runtime_log, LOG_INFO, "Header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+      multilog(runtime_log, LOG_ERR, "Header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       fprintf(stderr, "Header register failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;
     }
@@ -352,7 +352,7 @@ int align_df(sock_t *sock, int active_ports)
       if (recv(sock[i].sock, (void *)df, DF_SIZE, 0) < 0)
 	// If the size is -1, means we get time out and the port is not active
 	{
-	  multilog(runtime_log, LOG_INFO, "Can not receive data from %s:%d, which happens at \"%s\", line [%d].\n", inet_ntoa(sock[i].sa.sin_addr), ntohs(sock[i].sa.sin_port), __FILE__, __LINE__);
+	  multilog(runtime_log, LOG_ERR, "Can not receive data from %s:%d, which happens at \"%s\", line [%d].\n", inet_ntoa(sock[i].sa.sin_addr), ntohs(sock[i].sa.sin_port), __FILE__, __LINE__);
 	  fprintf (stderr, "Can not receive data from %s:%d, which happens at \"%s\", line [%d].\n", inet_ntoa(sock[i].sa.sin_addr), ntohs(sock[i].sa.sin_port), __FILE__, __LINE__);
 	  sock[i].active = 0;
 	  close(sock[i].sock);
@@ -378,7 +378,7 @@ int align_df(sock_t *sock, int active_ports)
 	  if (recv(sock[i].sock, (void *)df, DF_SIZE, 0) < 0)
 	    // If the size is -1, means we get time out and the port is not active
 	    {
-	      multilog(runtime_log, LOG_INFO, "Can not receive data from %s:%d, which happens at \"%s\", line [%d].\n", inet_ntoa(sock[i].sa.sin_addr), ntohs(sock[i].sa.sin_port), __FILE__, __LINE__);
+	      multilog(runtime_log, LOG_ERR, "Can not receive data from %s:%d, which happens at \"%s\", line [%d].\n", inet_ntoa(sock[i].sa.sin_addr), ntohs(sock[i].sa.sin_port), __FILE__, __LINE__);
 	      fprintf (stderr, "Can not receive data from %s:%d, which happens at \"%s\", line [%d].\n", inet_ntoa(sock[i].sa.sin_addr), ntohs(sock[i].sa.sin_port), __FILE__, __LINE__);
 	      sock[i].active = 0;
 	      close(sock[i].sock);
@@ -437,7 +437,7 @@ void *capture_thread(void *conf)
     {      
       if(recvfrom(sock.sock, (void *)df, DF_SIZE, 0, (struct sockaddr *)&sa, &fromlen) == -1)
 	{
-	  multilog(runtime_log, LOG_INFO,  "Can not receive data from %s:%d, which happens at \"%s\", line [%d].\n", inet_ntoa(sock.sa.sin_addr), ntohs(sock.sa.sin_port), __FILE__, __LINE__);
+	  multilog(runtime_log, LOG_ERR,  "Can not receive data from %s:%d, which happens at \"%s\", line [%d].\n", inet_ntoa(sock.sa.sin_addr), ntohs(sock.sa.sin_port), __FILE__, __LINE__);
 	  fprintf (stderr, "Can not receive data from %s:%d, which happens at \"%s\", line [%d].\n", inet_ntoa(sock.sa.sin_addr), ntohs(sock.sa.sin_port), __FILE__, __LINE__);
 
 	  /* Force to quit if we have time out */

@@ -39,11 +39,11 @@ int main(int argc, char **argv)
 	  break;
 	  
 	case 'd':
-	  sscanf(optarg, "%s", &fdir);
+	  sscanf(optarg, "%s", fdir);
 	  break;
 	  
 	case 'n':
-	  sscanf(optarg, "%s", &fname);
+	  sscanf(optarg, "%s", fname);
 	  break;
 
 	case 'h':

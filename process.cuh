@@ -58,11 +58,11 @@
 typedef struct conf_t
 {
   int device_id;
-  int debug;
+  int stream;
   
   char hfname[MSTR_LEN];
   int sod;
-  int stream_ndfstp;
+  int stream_ndf;
   int nstream;
   float scl_ndim;
 
@@ -81,7 +81,7 @@ typedef struct conf_t
 
   double freq;
   
-  double rbufin_ndfstp;
+  double rbufin_ndf;
   size_t bufin_size, bufout_size; // Device buffer size for all streams
   size_t sbufin_size, sbufout_size; // Buffer size for each stream
   size_t bufrt1_size, bufrt2_size;
