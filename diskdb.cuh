@@ -29,7 +29,7 @@ typedef struct conf_t
   int device_id;
 }conf_t;
 
-int init_diskdb(char conf_fname[MSTR_LEN], conf_t *conf);
+int init_diskdb(conf_t *conf);
 int destroy_diskdb(conf_t conf);
 int do_diskdb(conf_t conf);
 #endif

@@ -9,7 +9,7 @@
 #include "diskdb.cuh"
 #include "cudautil.cuh"
 
-int init_diskdb(char conf_fname[MSTR_LEN], conf_t *conf)
+int init_diskdb(conf_t *conf)
 {
   ipcbuf_t *db = NULL;
   
@@ -65,13 +65,6 @@ int init_diskdb(char conf_fname[MSTR_LEN], conf_t *conf)
   	  return EXIT_FAILURE;
   	}
     }
-  
-  /* registers the existing host memory range for use by CUDA */
-  //CudaSafeCall(cudaSetDevice(conf->device_id));
-  //size_t nbufs;
-  //nbufs = ipcbuf_get_nbufs(db);
-  //for(i = 0; i < nbufs; i++)
-  //  CudaSafeCall(cudaHostRegister(db->buffer[i], conf->rbufsz, cudaHostRegisterDefault));
   
   fseek(conf->fp, DADA_HDR_SIZE, SEEK_SET);
     

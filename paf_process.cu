@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
   int arg;
   conf_t conf;
   FILE *fp_log = NULL;
-  char log_fname[MSTR_LEN], hfname[MSTR_LEN];
+  char log_fname[MSTR_LEN];
   
   /* Initial part */  
   while((arg=getopt(argc,argv,"a:b:c:d:e:f:g:hi:j:k:l:")) != -1)
@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
 	{
 	case 'h':
 	  usage();
-	  return EXIT_SUCCESS;
+	  return EXIT_FAILURE;
 	  
 	case 'a':	  
 	  if (sscanf (optarg, "%x", &conf.key_in) != 1)
@@ -95,7 +95,7 @@ int main(int argc, char *argv[])
 	  break;
 
 	case 'j':	  	  
-	  sscanf(optarg, "%s", hfname);
+	  sscanf(optarg, "%s", conf.hfname);
 	  break;
 
 	case 'k':
@@ -107,7 +107,6 @@ int main(int argc, char *argv[])
 	  break;	  
 	}
     }
-  sprintf(conf.hfname, "%s/%s", conf.dir, hfname);
 
   /* Setup log interface */
   sprintf(log_fname, "%s/paf_process.log", conf.dir);

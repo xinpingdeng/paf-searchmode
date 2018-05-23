@@ -40,7 +40,7 @@ void usage()
 	   " -h Show help    \n"
 	   " -i The center frequency of captured data    \n"
 	   " -j The length of data capture    \n"
-	   " -k Which directory will be used to receive data    \n");
+	   " -k Which directory will be used to record data    \n");
 }
 
 int main(int argc, char **argv)
@@ -62,7 +62,7 @@ int main(int argc, char **argv)
 	{
 	case 'h':
 	  usage();
-	  return EXIT_SUCCESS;
+	  return EXIT_FAILURE;
 	  
 	case 'a':	  	  
 	  if (sscanf (optarg, "%x", &conf.key) != 1)
@@ -90,11 +90,11 @@ int main(int argc, char **argv)
 	  break;
 
 	case 'f':	  	  
-	  sscanf(optarg, "%s", hfname);
+	  sscanf(optarg, "%s", conf.hfname);
 	  break;
 
 	case 'g':
-	  sscanf(optarg, "%s", efname);
+	  sscanf(optarg, "%s", conf.efname);
 	  break;
 
 	case 'i':
@@ -110,8 +110,6 @@ int main(int argc, char **argv)
 	  break;
 	}
     }
-  sprintf(conf.efname, "%s/%s", conf.dir, efname);
-  sprintf(conf.hfname, "%s/%s", conf.dir, hfname);
 
   // Hostname, ip etc
   hostname[HN_LEN] = '0';

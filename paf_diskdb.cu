@@ -7,53 +7,62 @@
 #include "diskdb.cuh"
 #include "paf_diskdb.cuh"
 
+void usage()
+{
+  fprintf (stdout,
+	   "paf_diskdb - read dada data file into shared memory \n"
+	   "\n"
+	   "Usage: paf_capture [options]\n"
+	   " -a Hexadecimal shared memory key for capture \n"
+	   " -b Directory with data file \n"
+	   " -c The name of data file    \n"
+	   " -d The name of header file  \n"
+	   " -e Enable start-of-data or not \n"
+	   " -h Show help    \n");
+}
+
 int main(int argc, char **argv)
 {
   int arg;
-  char conf_fname[MSTR_LEN];
-  conf_t conf;
   char fdir[MSTR_LEN], fname[MSTR_LEN];
+  conf_t conf;
   
-  while((arg=getopt(argc,argv,"k:c:s:d:n:h:g:")) != -1)
+  while((arg=getopt(argc,argv,"a:b:c:d:e:h:")) != -1)
     {
       switch(arg)
 	{
-	case 'k':	  	  
+	case 'h':
+	  usage();
+	  return EXIT_FAILURE;
+	  
+	case 'a':	  	  
 	  if (sscanf (optarg, "%x", &conf.key) != 1)
 	    {
 	      fprintf (stderr, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
 	      return EXIT_FAILURE;
 	    }
 	  break;
-	  
-	case 'c':
-	  sscanf(optarg, "%s", conf_fname);
-	  break;
-	  
-	case 's':
-	  sscanf(optarg, "%d", &conf.sod);
-	  break;
-	  
-	case 'g':
-	  sscanf(optarg, "%d", &conf.device_id);
-	  break;
-	  
-	case 'd':
+	 
+	case 'b':
 	  sscanf(optarg, "%s", fdir);
 	  break;
 	  
-	case 'n':
+	case 'c':
 	  sscanf(optarg, "%s", fname);
 	  break;
 
-	case 'h':
+	case 'd':
 	  sscanf(optarg, "%s", conf.hfname);
+	  break;
+	  
+	case 'e':
+	  sscanf(optarg, "%d", &conf.sod);
 	  break;
 	}
     }
   sprintf(conf.fname, "%s/%s", fdir, fname);
   
-  init_diskdb(conf_fname, &conf);
+  init_diskdb(&conf);
   do_diskdb(conf);
   destroy_diskdb(conf);
 
