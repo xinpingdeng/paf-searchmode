@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# ./fold_file.py -c fold_file.conf -d /beegfs/DENG/docker/ -p J0332+5434 -g 0 -v 0 -f 2018-04-18-04:20:45.571411_0000000000000000.000000.dada
+# ./fold_file.py -a fold_file.conf -b /beegfs/DENG/docker/ -c J0332+5434 -d 0 -e 0 -f 2018-04-18-04:20:45.571411_0000000000000000.000000.dada
 # tempo2 -f mypar.par -pred "sitename mjd1 mjd2 freq1 freq2 ntimecoeff nfreqcoeff seg_length"
 
 import os, time, threading, ConfigParser, argparse, socket, json, struct, sys
@@ -38,16 +38,16 @@ freq   = 1340.5  # it should be the value from main startup GUI of TOS plus 0.5
 stream = 0       # Now we are folding files
 
 # Read in command line arguments
-parser = argparse.ArgumentParser(description='Fold data from BMF stream')
-parser.add_argument('-c', '--cfname', type=str, nargs='+',
+parser = argparse.ArgumentParser(description='Fold data from DADA file')
+parser.add_argument('-a', '--cfname', type=str, nargs='+',
                     help='The name of configuration file')
-parser.add_argument('-d', '--directory', type=str, nargs='+',
+parser.add_argument('-b', '--directory', type=str, nargs='+',
                     help='In which directory we record the data and read configuration files and parameter files')
-parser.add_argument('-p', '--psrname', type=str, nargs='+',
+parser.add_argument('-c', '--psrname', type=str, nargs='+',
                     help='The name of pulsar')
-parser.add_argument('-g', '--gpu', type=int, nargs='+',
+parser.add_argument('-d', '--gpu', type=int, nargs='+',
                     help='The index of GPU')
-parser.add_argument('-v', '--visiblegpu', type=str, nargs='+',
+parser.add_argument('-e', '--visiblegpu', type=str, nargs='+',
                     help='Visible GPU, the parameter is for the usage inside docker container.')
 parser.add_argument('-f', '--dfname', type=str, nargs='+',
                     help='The name of data file.')
@@ -124,9 +124,9 @@ def process():
 def fold():
     # If we only have one visible GPU, we will have to set it to 0;
     if (multi_gpu):
-        os.system('dspsr -cpu {:d} -N {:s} {:s} -cuda {:d},{:d} -L {:d} -A'.format(fold_cpu, psrname, process_kfname, gpu, gpu, subint))
+        os.system('dspsr -cpu {:d} -E {:s}.par {:s} -cuda {:d},{:d} -L {:d} -A'.format(fold_cpu, psrname, process_kfname, gpu, gpu, subint))
     else:
-        os.system('dspsr -cpu {:d} -N {:s} {:s} -cuda 0,0 -L {:d} -A'.format(fold_cpu, psrname, process_kfname, subint))   
+        os.system('dspsr -cpu {:d} -E {:s}.par {:s} -cuda 0,0 -L {:d} -A'.format(fold_cpu, psrname, process_kfname, subint))   
          
 def main():
     # Create key files

@@ -15,5 +15,5 @@ RUN git config user.name "xinpingdeng" && \
     git checkout dev 
 RUN ./rebuild.py 0
 
-# ./fold_stream.py -c fold_stream.conf -n 0 -l 10 -d /beegfs/DENG/docker/ -p J0218+4232 -v 0
-#ENTRYPOINT ["./fold.py"]
+# ./fold_stream.py -a fold_stream.conf -b 0 -c 10 -d /beegfs/DENG/docker/ -e J0218+4232 -f 0
+#ENTRYPOINT ["./fold_stream.py"]

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# ./fold_stream.py -c fold_stream.conf -n 0 -l 10 -d /beegfs/DENG/docker/ -p J0218+4232 -v all 
+# ./fold_stream.py -a fold_stream.conf -b 0 -c 10 -d /beegfs/DENG/docker/ -e J0218+4232 -f all 
 # tempo2 -f mypar.par -pred "sitename mjd1 mjd2 freq1 freq2 ntimecoeff nfreqcoeff seg_length"
 
 # I made assumption here:
@@ -44,17 +44,17 @@ stream = 1       # For real-time folding, we fold on data stream
 
 # Read in command line arguments
 parser = argparse.ArgumentParser(description='Fold data from BMF stream')
-parser.add_argument('-c', '--cfname', type=str, nargs='+',
+parser.add_argument('-a', '--cfname', type=str, nargs='+',
                     help='The name of configuration file')
-parser.add_argument('-n', '--numa', type=int, nargs='+',
+parser.add_argument('-b', '--numa', type=int, nargs='+',
                     help='On which numa node we do the work, 0 or 1')
-parser.add_argument('-l', '--length', type=float, nargs='+',
+parser.add_argument('-c', '--length', type=float, nargs='+',
                 help='Length of data receiving')
 parser.add_argument('-d', '--directory', type=str, nargs='+',
                     help='In which directory we record the data and read configuration files and parameter files')
-parser.add_argument('-p', '--psrname', type=str, nargs='+',
+parser.add_argument('-e', '--psrname', type=str, nargs='+',
                     help='The name of pulsar')
-parser.add_argument('-v', '--visiblegpu', type=str, nargs='+',
+parser.add_argument('-f', '--visiblegpu', type=str, nargs='+',
                     help='Visible GPU, the parameter is for the usage inside docker container.')
 
 args         = parser.parse_args()
@@ -137,9 +137,9 @@ def process():
 def fold():
     # If we only have one visible GPU, we will have to set it to 0;
     if (multi_gpu):
-        os.system('dspsr -cpu {:d} -N {:s} {:s} -cuda {:d},{:d} -L {:d} -A'.format(fold_cpu, psrname, process_kfname, numa, numa, subint))
+        os.system('dspsr -cpu {:d} -E {:s}.par {:s} -cuda {:d},{:d} -L {:d} -A'.format(fold_cpu, psrname, process_kfname, numa, numa, subint))
     else:
-        os.system('dspsr -cpu {:d} -N {:s} {:s} -cuda 0,0 -L {:d} -A'.format(fold_cpu, psrname, process_kfname, subint))   
+        os.system('dspsr -cpu {:d} -E {:s}.par {:s} -cuda 0,0 -L {:d} -A'.format(fold_cpu, psrname, process_kfname, subint))   
          
 def main():
     # Create key files
