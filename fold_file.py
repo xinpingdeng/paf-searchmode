@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# ./fold_file.py -a fold_file.conf -b /beegfs/DENG/docker/ -c J0332+5434 -d 0 -e 0 -f 2018-04-18-04:20:45.571411_0000000000000000.000000.dada
+# ./fold_file.py -a fold_file.conf -b /beegfs/DENG/docker/ -c J0332+5434 -d 0 -e 0 -f 2018-04-17-19:22:11.56868_0000000000000000.000000.dada
 # tempo2 -f mypar.par -pred "sitename mjd1 mjd2 freq1 freq2 ntimecoeff nfreqcoeff seg_length"
 
 import os, time, threading, ConfigParser, argparse, socket, json, struct, sys

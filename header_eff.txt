@@ -15,9 +15,9 @@ FILE_SIZE    32768000000            # requested size of data files
 FILE_NUMBER  0                      # number of data file
 
 # time of the rising edge of the first time sample
-UTC_START    2018-04-18-04:20:45    # yyyy-mm-dd-hh:mm:ss, no fraction second
+UTC_START    2018-04-17-19:22:11    # yyyy-mm-dd-hh:mm:ss, no fraction second
 MJD_START    unset                  # MJD equivalent to the start UTC
-PICOSECONDS  571411000000	   # fraction second in pico second
+PICOSECONDS  56868000000	   # fraction second in pico second
 
 OBS_OFFSET   0                      # bytes offset from the start MJD/UTC
 OBS_OVERLAP  0                   # bytes by which neighbouring files overlap
