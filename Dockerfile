@@ -1,5 +1,6 @@
 # Develop a image from xinpingdeng/cuda9.1-cudnn7-devel-ubuntu16.04-with-paf-essential
-FROM xinpingdeng/cuda9.1-cudnn7-devel-ubuntu16.04-with-paf-essential
+#FROM xinpingdeng/cuda9.1-cudnn7-devel-ubuntu16.04-with-paf-essential
+FROM xinpingdeng/essential
 # docker run --runtime=nvidia ....
 
 # Set current user to pulsar and change to $HOME

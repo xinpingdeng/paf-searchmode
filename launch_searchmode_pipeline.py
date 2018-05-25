@@ -30,15 +30,13 @@ parser.add_argument('-e', '--cfname', type=str, nargs='+',
                     help='The name of configuration file')
 parser.add_argument('-f', '--ddir', type=str, nargs='+',
                     help='Directory with configuration file, timing model and to record data')
-parser.add_argument('-g', '--hdir', type=str, nargs='+',
-                    help='Home directory')
-parser.add_argument('-i', '--sdir', type=str, nargs='+',
+parser.add_argument('-g', '--sdir', type=str, nargs='+',
                     help='Source directory')
-parser.add_argument('-j', '--uid', type=int, nargs='+',
+parser.add_argument('-i', '--uid', type=int, nargs='+',
                     help='UID of user')
-parser.add_argument('-k', '--gid', type=int, nargs='+',
+parser.add_argument('-j', '--gid', type=int, nargs='+',
                     help='Group ID of the user belongs to')
-parser.add_argument('-l', '--dname', type=str, nargs='+',
+parser.add_argument('-k', '--dname', type=str, nargs='+',
                     help='The name of docker container')
 
 args    = parser.parse_args()
@@ -48,7 +46,6 @@ memsize = args.memsize[0] # The number here should be larger than the required s
 psrname = args.psrname[0]
 cfname  = args.cfname[0]
 ddir    = args.ddir[0]
-hdir    = args.hdir[0]
 sdir    = args.sdir[0]
 uid     = args.uid[0]
 gid     = args.gid[0]
@@ -57,10 +54,8 @@ dname   = args.dname[0]
 gpu     = numa  # Either numa or "all"
 dvolume = '{:s}:{:s}'.format(ddir, ddir)
 svolume = '{:s}:{:s}'.format(sdir, sdir)
-hvolume = '{:s}:{:s}'.format(hdir, hdir)
 
-#com_line = "docker run --runtime=nvidia -v {:s} -v {:s} -v{:s} -u {:d}:{:d} -e NVIDIA_VISIBLE_DEVICES={:s} -e NVIDIA_DRIVER_CAPABILITIES=all --rm --ulimit memlock={:d} --net=host --name {:s} xinpingdeng/searchmode -a {:s} -b {:d} -c {:f} -d {:s} -e {:s} -f {:s}".format(dvolume, svolume, hvolume, uid, gid, str(gpu), memsize, dname, cfname, numa, length, ddir, psrname, str(gpu))
-com_line = "docker run -it --runtime=nvidia -v {:s} -v {:s} -v{:s} -u {:d}:{:d} -e NVIDIA_VISIBLE_DEVICES={:s} -e NVIDIA_DRIVER_CAPABILITIES=all --rm --ulimit memlock={:d} --net=host --name {:s} xinpingdeng/searchmode".format(dvolume, svolume, hvolume, uid, gid, str(gpu), memsize, dname)
+com_line = "docker run -it --runtime=nvidia -v {:s} -v {:s} -v /home/pulsar/.Xauthority:/home/pulsar/.Xauthority -e DISPLAY -u {:d}:{:d} -e NVIDIA_VISIBLE_DEVICES={:s} -e NVIDIA_DRIVER_CAPABILITIES=all --rm --ulimit memlock={:d} --net=host --name {:s} searchmode".format(dvolume, svolume, uid, gid, str(gpu), memsize, dname)
 
 print com_line
 print "\nYou are going to a docker container with the name {:s}!\n".format(dname)
