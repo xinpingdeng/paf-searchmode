@@ -15,7 +15,7 @@
 
 import os, argparse
 
-# ./launch_searchmode_pipeline.py -a 20 -b 0 -c 80000000000 -d J0218+4232 -e fold_stream.conf -f /beegfs/DENG/docker -g /home/pulsar -i /home/pulsar/paf-searchmode -j 50000 -k 50000 -l searchmode
+# ./launch_searchmode_pipeline.py -a 20 -b 0 -c 80000000000 -d J0218+4232 -e fold_stream.conf -f /beegfs/DENG/docker -g /home/pulsar -i 50000 -k 50000 -l searchmode
 # Read in command line arguments
 parser = argparse.ArgumentParser(description='Launch the pipeline to catpure and fold data stream from BMF')
 parser.add_argument('-a', '--length', type=float, nargs='+',
@@ -30,8 +30,8 @@ parser.add_argument('-e', '--cfname', type=str, nargs='+',
                     help='The name of configuration file')
 parser.add_argument('-f', '--ddir', type=str, nargs='+',
                     help='Directory with configuration file, timing model and to record data')
-parser.add_argument('-g', '--sdir', type=str, nargs='+',
-                    help='Source directory')
+parser.add_argument('-g', '--hdir', type=str, nargs='+',
+                    help='Home directory')
 parser.add_argument('-i', '--uid', type=int, nargs='+',
                     help='UID of user')
 parser.add_argument('-j', '--gid', type=int, nargs='+',
@@ -46,16 +46,16 @@ memsize = args.memsize[0] # The number here should be larger than the required s
 psrname = args.psrname[0]
 cfname  = args.cfname[0]
 ddir    = args.ddir[0]
-sdir    = args.sdir[0]
+hdir    = args.hdir[0]
 uid     = args.uid[0]
 gid     = args.gid[0]
 dname   = args.dname[0]
 
 gpu     = numa  # Either numa or "all"
 dvolume = '{:s}:{:s}'.format(ddir, ddir)
-svolume = '{:s}:{:s}'.format(sdir, sdir)
+hvolume = '{:s}:{:s}'.format(hdir, hdir)
 
-com_line = "docker run -it --runtime=nvidia -v {:s} -v {:s} -v /home/pulsar/.Xauthority:/home/pulsar/.Xauthority -e DISPLAY -u {:d}:{:d} -e NVIDIA_VISIBLE_DEVICES={:s} -e NVIDIA_DRIVER_CAPABILITIES=all --rm --ulimit memlock={:d} --net=host --name {:s} searchmode".format(dvolume, svolume, uid, gid, str(gpu), memsize, dname)
+com_line = "docker run -it --runtime=nvidia -v {:s} -v {:s} -e DISPLAY -u {:d}:{:d} -e NVIDIA_VISIBLE_DEVICES={:s} -e NVIDIA_DRIVER_CAPABILITIES=all --rm --ulimit memlock={:d} --net=host --name {:s} searchmode".format(dvolume, hvolume, uid, gid, str(gpu), memsize, dname)
 
 print com_line
 print "\nYou are going to a docker container with the name {:s}!\n".format(dname)
