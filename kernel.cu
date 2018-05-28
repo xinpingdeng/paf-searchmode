@@ -367,6 +367,8 @@ __global__ void transpose_scale_kernel(cufftComplex *dbuf_rt2, int8_t *dbuf_out,
 */
 __global__ void transpose_scale_kernel4(cufftComplex *dbuf_rt2, int8_t *dbuf_out, size_t offset_rt2, float *ddat_offs, float *ddat_scl)
 {
+  // For 27 seconds data, 64-point FFT option needs around 720 ms
+  // 32-point FFT option needs around 520ms
   __shared__ int8_t tile[NPOL_SAMP * NDIM_POL][TILE_DIM][TILE_DIM];
 
   int i, x, y;

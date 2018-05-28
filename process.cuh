@@ -15,7 +15,7 @@
 #include "futils.h"
 #include "paf_process.cuh"
 
-#define CUFFT_NX64
+#define CUFFT_NX32
 
 #define DADA_HDR_SIZE         4096
 #define NCHK_NIC              48   // How many frequency chunks we will receive, we should read the number from metadata
@@ -72,8 +72,6 @@
    The second look into it turns out that the parameters here are more general.
 */
 //#define TILE_DIM              32              // CUFFT_NX2
-//#define NROWBLOCK_TRANS       8               // a good number which can be devided by CUFFT_NX2 (TILE_DIM)
-//#define TILE_DIM              64              // CUFFT_NX2
 //#define NROWBLOCK_TRANS       8               // a good number which can be devided by CUFFT_NX2 (TILE_DIM)
 
 typedef struct conf_t

@@ -407,7 +407,10 @@ int do_process(conf_t conf)
 	      
 	      /* Prepare for inverse FFT */
 	      swap_select_transpose_swap_kernel<<<gridsize_swap_select_transpose_swap, blocksize_swap_select_transpose_swap, 0, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], conf.nsamp1, conf.nsamp2); // This kernle is the combination of previous kernels	  
-	      
+	      // For search mode, here we need one moere kernel, which average the data in frequency and scale it, the name of this kernel will be average_detect_scale_kernel;
+	      // The key thing to remember is that after average, we do not have that much data and the size of grid and block need to be updated;
+	      // The kernel for fold mode after this line and inverse FFT are not needed for search mode;
+
 	      /* Do inverse FFT */
 	      CufftSafeCall(cufftExecC2C(conf.fft_plans2[j], &conf.buf_rt2[bufrt2_offset], &conf.buf_rt2[bufrt2_offset], CUFFT_INVERSE));
 	      
@@ -539,6 +542,10 @@ int dat_offs_scl(conf_t conf)
 	  /* Prepare for inverse FFT */
 	  swap_select_transpose_swap_kernel<<<gridsize_swap_select_transpose_swap, blocksize_swap_select_transpose_swap, 0, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], conf.nsamp1, conf.nsamp2); 
 
+	  // For search mode, we need to get a kernel to average data in frequency and pad data as I do with fold mode;
+	  // The key thing to remember is that after average, we do not have that much data and the size of grid and block need to be updated;
+	  // The sum kernel may need to be re-designed, at least the size of grid and block need to be updated;
+	  
 	  /* Do inverse FFT */
 	  CufftSafeCall(cufftExecC2C(conf.fft_plans2[j], &conf.buf_rt2[bufrt2_offset], &conf.buf_rt2[bufrt2_offset], CUFFT_INVERSE));
 
