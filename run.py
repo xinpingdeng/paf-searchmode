@@ -2,13 +2,5 @@
 
 import os
 
-length  = 20
-numa    = 0
-memsize = 80000000000
-hdir    = '/home/pulsar/'
-ddir    = '/beegfs/DENG/docker'
-uid     = 50000
-gid     = 50000
-dname   = 'paf-base'
-
-os.system('./launch_searchmode_pipeline.py -a {:f} -b {:d} -c {:d} -d {:s} -e {:s} -f {:d} -g {:d} -i {:s}'.format(length, numa, memsize, ddir, hdir, uid, gid, dname))
+#os.system("nvprof --profile-child-processes ./fold_stream.py -a fold_stream.conf -b 0 -c 10 -d /beegfs/DENG/docker/ -e J0218+4232 -f all")
+os.system("nvprof --profile-child-processes ./fold_file.py -a fold_file.conf -b /beegfs/DENG/docker/ -c J0332+5434 -d 0 -e 0 -f 2018-04-17-19:22:11.56868_0000000000000000.000000.dada")

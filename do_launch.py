@@ -15,9 +15,9 @@
 
 import os, argparse
 
-# ./launch_searchmode_pipeline.py -a 20 -b 0 -c 80000000000 -d /beegfs/DENG/docker -e /home/pulsar -f 50000 -g 50000 -i searchmode
+# ./do_launch.py -a 20 -b 0 -c 80000000000 -d /beegfs/DENG/docker -e /home/pulsar -f 50000 -g 50000 -i searchmode
 # Read in command line arguments
-parser = argparse.ArgumentParser(description='Launch the pipeline to catpure and fold data stream from BMF')
+parser = argparse.ArgumentParser(description='Launch the pipeline to catpure and fold data stream from BMF or from PSRDADA file')
 parser.add_argument('-a', '--length', type=float, nargs='+',
                     help='The length in second for data capture')
 parser.add_argument('-b', '--numa', type=int, nargs='+',

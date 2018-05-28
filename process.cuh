@@ -29,17 +29,24 @@
 
 #define OSAMP_RATEI           0.84375
 #define CUFFT_RANK1           1
+//#define CUFFT_NX1             64
+//#define CUFFT_MOD1            27             // Set to remove oversampled data
+//#define NCHAN_KEEP1           54             // (OSAMP_RATEI * CUFFT_NX1)
 #define CUFFT_NX1             32
-#define CUFFT_MOD1            13
+#define CUFFT_MOD1            13             // Set to remove oversampled data
 #define NCHAN_KEEP1           27             // (OSAMP_RATEI * CUFFT_NX1)
 
 #define CUFFT_RANK2           1
+//#define CUFFT_NX2             64
+//#define CUFFT_MOD2            32              // CUFFT_NX2 / 2
+//#define NCHAN_KEEP2           16384           // (CUFFT_NX2 * NCHAN_FINAL)
+//#define NCHAN_EDGE            880             // (NCHAN_KEEP1 * NCHK_NIC * NCHAN_CHK - CUFFT_NX2 * NCHAN_FINAL)/2
 #define CUFFT_NX2             32
 #define CUFFT_MOD2            16              // CUFFT_NX2 / 2
-#define NCHAN_KEEP2           8192            // (CUFFT_NX2 * NCHAN_FINAL)
+#define NCHAN_KEEP2           8192           // (CUFFT_NX2 * NCHAN_FINAL)
 #define NCHAN_EDGE            440             // (NCHAN_KEEP1 * NCHK_NIC * NCHAN_CHK - CUFFT_NX2 * NCHAN_FINAL)/2
-#define NCHAN_RATEI           1.107421875     // (CUFFT_NX2 * NCHAN_FINAL)/(NCHAN_KEEP1 * NCHK_NIC * NCHAN_CHK)
 
+#define NCHAN_RATEI           1.107421875     // (NCHAN_KEEP1 * NCHK_NIC * NCHAN_CHK)/(CUFFT_NX2 * NCHAN_FINAL)
 #define NCHAN_FINAL           256             // Final number of channels
 
 #define SCL_INT8              127.0f          // For int8_t
