@@ -15,6 +15,8 @@
 #include "futils.h"
 #include "paf_process.cuh"
 
+#define CUFFT_NX64
+
 #define DADA_HDR_SIZE         4096
 #define NCHK_NIC              48   // How many frequency chunks we will receive, we should read the number from metadata
 #define NCHAN_CHK             7
@@ -29,22 +31,31 @@
 
 #define OSAMP_RATEI           0.84375
 #define CUFFT_RANK1           1
-//#define CUFFT_NX1             64
-//#define CUFFT_MOD1            27             // Set to remove oversampled data
-//#define NCHAN_KEEP1           54             // (OSAMP_RATEI * CUFFT_NX1)
+#define CUFFT_RANK2           1
+
+#ifdef CUFFT_NX32
 #define CUFFT_NX1             32
 #define CUFFT_MOD1            13             // Set to remove oversampled data
 #define NCHAN_KEEP1           27             // (OSAMP_RATEI * CUFFT_NX1)
-
-#define CUFFT_RANK2           1
-//#define CUFFT_NX2             64
-//#define CUFFT_MOD2            32              // CUFFT_NX2 / 2
-//#define NCHAN_KEEP2           16384           // (CUFFT_NX2 * NCHAN_FINAL)
-//#define NCHAN_EDGE            880             // (NCHAN_KEEP1 * NCHK_NIC * NCHAN_CHK - CUFFT_NX2 * NCHAN_FINAL)/2
 #define CUFFT_NX2             32
 #define CUFFT_MOD2            16              // CUFFT_NX2 / 2
 #define NCHAN_KEEP2           8192           // (CUFFT_NX2 * NCHAN_FINAL)
 #define NCHAN_EDGE            440             // (NCHAN_KEEP1 * NCHK_NIC * NCHAN_CHK - CUFFT_NX2 * NCHAN_FINAL)/2
+#define TILE_DIM              32              // CUFFT_NX2
+#define NROWBLOCK_TRANS       8               // a good number which can be devided by CUFFT_NX2 (TILE_DIM)
+#endif
+
+#ifdef CUFFT_NX64
+#define CUFFT_NX1             64
+#define CUFFT_MOD1            27             // Set to remove oversampled data
+#define NCHAN_KEEP1           54             // (OSAMP_RATEI * CUFFT_NX1)
+#define CUFFT_NX2             64
+#define CUFFT_MOD2            32              // CUFFT_NX2 / 2
+#define NCHAN_KEEP2           16384           // (CUFFT_NX2 * NCHAN_FINAL)
+#define NCHAN_EDGE            880             // (NCHAN_KEEP1 * NCHK_NIC * NCHAN_CHK - CUFFT_NX2 * NCHAN_FINAL)/2
+#define TILE_DIM              64              // CUFFT_NX2
+#define NROWBLOCK_TRANS       16              // a good number which can be devided by CUFFT_NX2 (TILE_DIM)
+#endif
 
 #define NCHAN_RATEI           1.107421875     // (NCHAN_KEEP1 * NCHK_NIC * NCHAN_CHK)/(CUFFT_NX2 * NCHAN_FINAL)
 #define NCHAN_FINAL           256             // Final number of channels
@@ -58,9 +69,12 @@
    For example, if we change the NCHAN_FINAL or CUFFT_NX2, we need to change the parameters here;
    We may not be able to find a suitable parameter if we do the change;
    In short, the current setup here only works with selected configuration.
+   The second look into it turns out that the parameters here are more general.
 */
-#define TILE_DIM              32              // CUFFT_NX2
-#define NROWBLOCK_TRANS       8               // a good number which can be devided by CUFFT_NX2 (TILE_DIM)
+//#define TILE_DIM              32              // CUFFT_NX2
+//#define NROWBLOCK_TRANS       8               // a good number which can be devided by CUFFT_NX2 (TILE_DIM)
+//#define TILE_DIM              64              // CUFFT_NX2
+//#define NROWBLOCK_TRANS       8               // a good number which can be devided by CUFFT_NX2 (TILE_DIM)
 
 typedef struct conf_t
 {
