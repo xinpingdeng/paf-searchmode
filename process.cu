@@ -82,7 +82,6 @@ int init_process(conf_t *conf)
   conf->bufin_size          = conf->nstream * conf->sbufin_size;
   conf->bufout_size_fold    = conf->nstream * conf->sbufout_size_fold;
   conf->bufout_size_search  = conf->nstream * conf->sbufout_size_search;
-  //fprintf(stdout, "%ld", conf->bufout_size_search);
   
   conf->sbufrt1_size = conf->npol1 * NBYTE_RT;
   conf->sbufrt2_size = conf->npol2 * NBYTE_RT;
@@ -101,33 +100,36 @@ int init_process(conf_t *conf)
   conf->dbufout_offset_search = conf->sbufout_size_search / NBYTE_OUT_SEARCH;
   //conf->hbufout_offset_search = conf->sbufout_size_search / sizeof(char);
   conf->hbufout_offset_search = conf->sbufout_size_search;
-  
+
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_in, conf->bufin_size));   
-  CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out_fold, conf->bufout_size_fold)); 
-  CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out_search, conf->bufout_size_search));
+  if(FOLD_MODE)
+    {
+      CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out_fold, conf->bufout_size_fold));       
+      CudaSafeCall(cudaMalloc((void **)&conf->ddat_offs_fold, NCHAN_FOLD * sizeof(float)));
+      CudaSafeCall(cudaMalloc((void **)&conf->dsquare_mean_fold, NCHAN_FOLD * sizeof(float)));
+      CudaSafeCall(cudaMalloc((void **)&conf->ddat_scl_fold, NCHAN_FOLD * sizeof(float)));
+      
+      CudaSafeCall(cudaMemset((void *)conf->ddat_offs_fold, 0, NCHAN_FOLD * sizeof(float)));   // We have to clear the memory for this parameter
+      CudaSafeCall(cudaMemset((void *)conf->dsquare_mean_fold, 0, NCHAN_FOLD * sizeof(float)));// We have to clear the memory for this parameter
   
-  CudaSafeCall(cudaMalloc((void **)&conf->ddat_offs_fold, NCHAN_FOLD * sizeof(float)));
-  CudaSafeCall(cudaMalloc((void **)&conf->dsquare_mean_fold, NCHAN_FOLD * sizeof(float)));
-  CudaSafeCall(cudaMalloc((void **)&conf->ddat_scl_fold, NCHAN_FOLD * sizeof(float)));
-  
-  CudaSafeCall(cudaMemset((void *)conf->ddat_offs_fold, 0, NCHAN_FOLD * sizeof(float)));   // We have to clear the memory for this parameter
-  CudaSafeCall(cudaMemset((void *)conf->dsquare_mean_fold, 0, NCHAN_FOLD * sizeof(float)));// We have to clear the memory for this parameter
-  
-  CudaSafeCall(cudaMallocHost((void **)&conf->hdat_scl_fold, NCHAN_FOLD * sizeof(float)));   // Malloc host memory to receive data from device
-  CudaSafeCall(cudaMallocHost((void **)&conf->hdat_offs_fold, NCHAN_FOLD * sizeof(float)));   // Malloc host memory to receive data from device
-  CudaSafeCall(cudaMallocHost((void **)&conf->hsquare_mean_fold, NCHAN_FOLD * sizeof(float)));   // Malloc host memory to receive data from device
-
-  CudaSafeCall(cudaMalloc((void **)&conf->ddat_offs_search, NCHAN_SEARCH * sizeof(float)));
-  CudaSafeCall(cudaMalloc((void **)&conf->dsquare_mean_search, NCHAN_SEARCH * sizeof(float)));
-  CudaSafeCall(cudaMalloc((void **)&conf->ddat_scl_search, NCHAN_SEARCH * sizeof(float)));
-  
-  CudaSafeCall(cudaMemset((void *)conf->ddat_offs_search, 0, NCHAN_SEARCH * sizeof(float)));   // We have to clear the memory for this parameter
-  CudaSafeCall(cudaMemset((void *)conf->dsquare_mean_search, 0, NCHAN_SEARCH * sizeof(float)));// We have to clear the memory for this parameter
-  
-  CudaSafeCall(cudaMallocHost((void **)&conf->hdat_scl_search, NCHAN_SEARCH * sizeof(float)));   // Malloc host memory to receive data from device
-  CudaSafeCall(cudaMallocHost((void **)&conf->hdat_offs_search, NCHAN_SEARCH * sizeof(float)));   // Malloc host memory to receive data from device
-  CudaSafeCall(cudaMallocHost((void **)&conf->hsquare_mean_search, NCHAN_SEARCH * sizeof(float)));   // Malloc host memory to receive data from device
-
+      CudaSafeCall(cudaMallocHost((void **)&conf->hdat_scl_fold, NCHAN_FOLD * sizeof(float)));   // Malloc host memory to receive data from device
+      CudaSafeCall(cudaMallocHost((void **)&conf->hdat_offs_fold, NCHAN_FOLD * sizeof(float)));   // Malloc host memory to receive data from device
+      CudaSafeCall(cudaMallocHost((void **)&conf->hsquare_mean_fold, NCHAN_FOLD * sizeof(float)));   // Malloc host memory to receive data from device
+    }
+  else
+    {
+      CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out_search, conf->bufout_size_search));
+      CudaSafeCall(cudaMalloc((void **)&conf->ddat_offs_search, NCHAN_SEARCH * sizeof(float)));
+      CudaSafeCall(cudaMalloc((void **)&conf->dsquare_mean_search, NCHAN_SEARCH * sizeof(float)));
+      CudaSafeCall(cudaMalloc((void **)&conf->ddat_scl_search, NCHAN_SEARCH * sizeof(float)));
+      
+      CudaSafeCall(cudaMemset((void *)conf->ddat_offs_search, 0, NCHAN_SEARCH * sizeof(float)));   // We have to clear the memory for this parameter
+      CudaSafeCall(cudaMemset((void *)conf->dsquare_mean_search, 0, NCHAN_SEARCH * sizeof(float)));// We have to clear the memory for this parameter
+      
+      CudaSafeCall(cudaMallocHost((void **)&conf->hdat_scl_search, NCHAN_SEARCH * sizeof(float)));   // Malloc host memory to receive data from device
+      CudaSafeCall(cudaMallocHost((void **)&conf->hdat_offs_search, NCHAN_SEARCH * sizeof(float)));   // Malloc host memory to receive data from device
+      CudaSafeCall(cudaMallocHost((void **)&conf->hsquare_mean_search, NCHAN_SEARCH * sizeof(float)));   // Malloc host memory to receive data from device
+    }
   CudaSafeCall(cudaMalloc((void **)&conf->buf_rt1, conf->bufrt1_size));
   CudaSafeCall(cudaMalloc((void **)&conf->buf_rt2, conf->bufrt2_size)); 
 
@@ -373,24 +375,24 @@ int init_process(conf_t *conf)
 	}
     }
   
-  //if(conf->sod)
-  //  {      
-  //    if(ipcbuf_enable_sod(db, 0, 0) < 0)  // We start at the beginning
-  //	{
-  //multilog(runtime_log, LOG_ERR, "Can not write data before start, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //	  fprintf(stderr, "Can not write data before start, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //	  return EXIT_FAILURE;
-  //	}
-  //  }
-  //else
-  //  {
-  //    if(ipcbuf_disable_sod(db) < 0)
-  //	{
-  //multilog(runtime_log, LOG_ERR, "Can not write data before start, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //	  fprintf(stderr, "Can not write data before start, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //	  return EXIT_FAILURE;
-  //	}
-  //  }
+  if(conf->sod)
+    {      
+      if(ipcbuf_enable_sod(db, 0, 0) < 0)  // We start at the beginning
+  	{
+	  multilog(runtime_log, LOG_ERR, "Can not write data before start, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  	  fprintf(stderr, "Can not write data before start, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  	  return EXIT_FAILURE;
+  	}
+    }
+  else
+    {
+      if(ipcbuf_disable_sod(db) < 0)
+  	{
+	  multilog(runtime_log, LOG_ERR, "Can not write data before start, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  	  fprintf(stderr, "Can not write data before start, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  	  return EXIT_FAILURE;
+  	}
+    }
       
   /* Register header */
   if(register_header(conf))
@@ -495,9 +497,10 @@ int do_process(conf_t conf)
 	  CudaSafeCall(cudaEventCreate(&stop_event));
 	  CudaSafeCall(cudaEventRecord(start_event));
 #endif
-	  
+	  //fprintf(stdout, "REPEAT HERE\n\n");
 	  for(j = 0; j < conf.nstream; j++)
 	    {
+	      //fprintf(stdout, "STREAM HERE 1\t");
 	      hbufin_offset = j * conf.hbufin_offset + i * conf.bufin_size;
 	      dbufin_offset = j * conf.dbufin_offset; 
 	      bufrt1_offset = j * conf.bufrt1_offset;
@@ -545,10 +548,10 @@ int do_process(conf_t conf)
 	      else
 		{
 		  swap_select_transpose_kernel<<<gridsize_swap_select_transpose, blocksize_swap_select_transpose, 0, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], conf.nsamp1, conf.nsamp2); 		  
-		  add_detect_scale_kernel<<<gridsize_add_detect_scale, blocksize_add_detect_scale, 0, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out_search[dbufout_offset_search], conf.nsamp2, conf.ddat_offs_search, conf.ddat_scl_search);
-
+		  add_detect_scale_kernel<<<gridsize_add_detect_scale, blocksize_add_detect_scale, blocksize_add_detect_scale.x * sizeof(cufftComplex), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out_search[dbufout_offset_search], conf.nsamp2, conf.ddat_offs_search, conf.ddat_scl_search);
 		  CudaSafeCall(cudaMemcpyAsync(&conf.hdu_out_search->data_block->curbuf[hbufout_offset_search], &conf.dbuf_out_search[dbufout_offset_search], conf.sbufout_size_search, cudaMemcpyDeviceToHost, conf.streams[j]));
 		}
+	      //fprintf(stdout, "STREAM HERE 2\n");
 	    }
 	  CudaSynchronizeCall(); // Sync here is for multiple streams
 	  
@@ -830,32 +833,40 @@ int destroy_process(conf_t conf)
     }
   
   cudaFree(conf.dbuf_in);
-  cudaFree(conf.dbuf_out_fold);
-  cudaFree(conf.dbuf_out_search);
-
-  cudaFreeHost(conf.hdat_offs_fold);
-  cudaFreeHost(conf.hsquare_mean_fold);
-  cudaFreeHost(conf.hdat_scl_fold);
-  cudaFree(conf.ddat_offs_fold);
-  cudaFree(conf.dsquare_mean_fold);
-  cudaFree(conf.ddat_scl_fold);
-
-  cudaFreeHost(conf.hdat_offs_search);
-  cudaFreeHost(conf.hsquare_mean_search);
-  cudaFreeHost(conf.hdat_scl_search);
-  cudaFree(conf.ddat_offs_search);
-  cudaFree(conf.dsquare_mean_search);
-  cudaFree(conf.ddat_scl_search);
+  if(FOLD_MODE)
+    {
+      cudaFree(conf.dbuf_out_fold);
+      cudaFreeHost(conf.hdat_offs_fold);
+      cudaFreeHost(conf.hsquare_mean_fold);
+      cudaFreeHost(conf.hdat_scl_fold);
+      cudaFree(conf.ddat_offs_fold);
+      cudaFree(conf.dsquare_mean_fold);
+      cudaFree(conf.ddat_scl_fold);
+      
+      dada_hdu_unlock_write(conf.hdu_out_fold);
+      dada_hdu_disconnect(conf.hdu_out_fold);
+      dada_hdu_destroy(conf.hdu_out_fold);
+    }
+  else
+    {
+      cudaFree(conf.dbuf_out_search);
+      cudaFreeHost(conf.hdat_offs_search);
+      cudaFreeHost(conf.hsquare_mean_search);
+      cudaFreeHost(conf.hdat_scl_search);
+      cudaFree(conf.ddat_offs_search);
+      cudaFree(conf.dsquare_mean_search);
+      cudaFree(conf.ddat_scl_search);
+      
+      dada_hdu_unlock_write(conf.hdu_out_search);
+      dada_hdu_disconnect(conf.hdu_out_search);
+      dada_hdu_destroy(conf.hdu_out_search);
+    }
   
   cudaFree(conf.buf_rt1);
   cudaFree(conf.buf_rt2);
 
   dada_cuda_dbunregister(conf.hdu_in);
   
-  dada_hdu_unlock_write(conf.hdu_out_fold);
-  dada_hdu_disconnect(conf.hdu_out_fold);
-  dada_hdu_destroy(conf.hdu_out_fold);
-
   dada_hdu_unlock_read(conf.hdu_in);
   dada_hdu_disconnect(conf.hdu_in);
   dada_hdu_destroy(conf.hdu_in);

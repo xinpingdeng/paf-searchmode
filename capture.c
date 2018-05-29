@@ -619,24 +619,24 @@ int init_rbuf(conf_t *conf)
       return EXIT_FAILURE;
     }
 
-  //if(conf->sod)
-  //  {      
-  //    if(ipcbuf_enable_sod((ipcbuf_t *)db, 0, 0) < 0)  // We start at the beginning
-  //	{
-  //  multilog (runtime_log, "Can not write data before start, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //	  fprintf(stderr, "Can not write data before start, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //	  return EXIT_FAILURE;
-  //	}
-  //  }
-  //else
-  //  {
-  //    if(ipcbuf_disable_sod((ipcbuf_t *)db) < 0)
-  //	{
-  //multilog (runtime_log, "Can not write data before start, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //	  fprintf(stderr, "Can not write data before start, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-  //	  return EXIT_FAILURE;
-  //	}
-  //  }
+  if(conf->sod)
+    {      
+      if(ipcbuf_enable_sod((ipcbuf_t *)db, 0, 0) < 0)  // We start at the beginning
+  	{
+	  multilog (runtime_log, LOG_ERR, "Can not write data before start, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  	  fprintf(stderr, "Can not write data before start, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  	  return EXIT_FAILURE;
+  	}
+    }
+  else
+    {
+      if(ipcbuf_disable_sod((ipcbuf_t *)db) < 0)
+  	{
+	  multilog (runtime_log, LOG_ERR, "Can not write data before start, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  	  fprintf(stderr, "Can not write data before start, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+  	  return EXIT_FAILURE;
+  	}
+    }
 
   return EXIT_SUCCESS;
 }

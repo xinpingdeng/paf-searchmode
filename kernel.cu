@@ -50,6 +50,7 @@ __global__ void unpack_kernel(int64_t *dbuf_in,  cufftComplex *dbuf_rt1, size_t 
    This kernel is used to :
    1. swap the halves of CUDA FFT output, we need to do that because CUDA FFT put the centre frequency at bin 0;
    2. drop the first three and last two points of the swapped 32-points FFT output, which will reduce to oversample rate to 1;
+      for 64 points FFT, drop the first and last five points;
    3. drop the edge of passband to give a good number for reverse FFT;
    4. reorder the FFT data from PFTF to PTF;
    5. we can also easily do de-dispersion here, which is not here yet.
@@ -105,6 +106,7 @@ __global__ void swap_kernel(cufftComplex *dbuf_rt, cufftComplex *dbuf_rt2, size_
    This is a combination of swap_select_transpose_kernel and swap_kernel, it is is used to :
    1. swap the halves of CUDA FFT output, we need to do that because CUDA FFT put the centre frequency at bin 0;
    2. drop the first three and last two points of the swapped 32-points FFT output, which will reduce to oversample rate to 1;
+      for 64 points FFT, drop the first and last five points;
    3. drop the edge of passband to give a good number for reverse FFT;
    4. reorder the FFT data from PFTF to PTF;
    5. swap the halves to make sure that the centre frequency in each reverse FFT segment is in bin 0;
@@ -499,8 +501,8 @@ __global__ void add_detect_scale_kernel(cufftComplex *dbuf_rt2, uint8_t *dbuf_ou
   if (tid == 0)
     {
       loc_freq = blockIdx.y;
-      flux = sqrtf(sdata[0].x * sdata[0].x + sdata[0].y * sdata[0].y); // Detect it;      
-      dbuf_out_search[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((flux - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);// scale it;
+      //flux = sqrtf(sdata[0].x * sdata[0].x + sdata[0].y * sdata[0].y); // Detect it;      
+      //dbuf_out_search[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((flux - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);// scale it;
     }
 }
 
