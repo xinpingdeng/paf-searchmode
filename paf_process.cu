@@ -31,7 +31,7 @@ void usage ()
 	   " -i  The index of GPU\n"
 	   " -j  The name of DADA header template\n"
 	   " -k  The directory for data recording\n"
-	   " -l  The source of fold data, stream or files\n");
+	   " -l  The source of data, stream or files\n");
 }
 
 multilog_t *runtime_log;
@@ -61,12 +61,24 @@ int main(int argc, char *argv[])
 	    }
 	  break;
 	  
-	case 'b':	  
-	  if (sscanf (optarg, "%x", &conf.key_out_fold) != 1)
+	case 'b':
+	  if(FOLD_MODE)
 	    {
-	      //multilog (runtime_log, LOG_ERR, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
-	      fprintf (stderr, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
-	      return EXIT_FAILURE;
+	      if (sscanf (optarg, "%x", &conf.key_out_fold) != 1)
+		{
+		  //multilog (runtime_log, LOG_ERR, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
+		  fprintf (stderr, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
+		  return EXIT_FAILURE;
+		}
+	    }
+	  else
+	    {
+	      if (sscanf (optarg, "%x", &conf.key_out_search) != 1)
+		{
+		  //multilog (runtime_log, LOG_ERR, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
+		  fprintf (stderr, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
+		  return EXIT_FAILURE;
+		}
 	    }
 	  break;
 	  	  

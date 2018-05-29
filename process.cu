@@ -88,15 +88,18 @@ int init_process(conf_t *conf)
   conf->bufrt1_size  = conf->nstream * conf->sbufrt1_size;
   conf->bufrt2_size  = conf->nstream * conf->sbufrt2_size;
     
-  conf->hbufin_offset = conf->sbufin_size / sizeof(char);
+  //conf->hbufin_offset = conf->sbufin_size / sizeof(char);
+  conf->hbufin_offset = conf->sbufin_size;
   conf->dbufin_offset = conf->sbufin_size / sizeof(int64_t);
   conf->bufrt1_offset = conf->sbufrt1_size / sizeof(cufftComplex);
   conf->bufrt2_offset = conf->sbufrt2_size / sizeof(cufftComplex);
   
   conf->dbufout_offset_fold   = conf->sbufout_size_fold / NBYTE_OUT_FOLD;
-  conf->hbufout_offset_fold   = conf->sbufout_size_fold / sizeof(char);
+  //conf->hbufout_offset_fold   = conf->sbufout_size_fold / sizeof(char);
+  conf->hbufout_offset_fold   = conf->sbufout_size_fold;
   conf->dbufout_offset_search = conf->sbufout_size_search / NBYTE_OUT_SEARCH;
-  conf->hbufout_offset_search = conf->sbufout_size_search / sizeof(char);
+  //conf->hbufout_offset_search = conf->sbufout_size_search / sizeof(char);
+  conf->hbufout_offset_search = conf->sbufout_size_search;
   
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_in, conf->bufin_size));   
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out_fold, conf->bufout_size_fold)); 
@@ -542,6 +545,7 @@ int do_process(conf_t conf)
 		{
 		  swap_select_transpose_kernel<<<gridsize_swap_select_transpose, blocksize_swap_select_transpose, 0, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], conf.nsamp1, conf.nsamp2); 		  
 		  add_detect_scale_kernel<<<gridsize_add_detect_scale, blocksize_add_detect_scale, 0, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out_search[dbufout_offset_search], conf.nsamp2, conf.ddat_offs_search, conf.ddat_scl_search);
+		  CudaSafeCall(cudaMemcpyAsync(&conf.hdu_out_search->data_block->curbuf[hbufout_offset_search], &conf.dbuf_out_search[dbufout_offset_search], conf.sbufout_size_search, cudaMemcpyDeviceToHost, conf.streams[j]));
 		}
 	    }
 	  CudaSynchronizeCall(); // Sync here is for multiple streams
@@ -582,7 +586,7 @@ int do_process(conf_t conf)
 #ifdef DEBUG
       clock_gettime(CLOCK_REALTIME, &stop);
       elapsed_time = (stop.tv_sec - start.tv_sec) + (stop.tv_nsec - start.tv_nsec)/1000000000.0L;
-      fprintf(stdout, "elapsed time to write %d data frame steps is %f s\n\n", conf.rbufin_ndf , elapsed_time);
+      fprintf(stdout, "elapsed time to write %.0f data frame steps is %f\n\n", conf.rbufin_ndf , elapsed_time);
 #endif
 #ifdef DEBUG
       clock_gettime(CLOCK_REALTIME, &start);
@@ -902,13 +906,66 @@ int register_header(conf_t *conf)
     }
   
   if(conf->stream)
-    {
+    {      
+      /* Get utc_start from hdrin */
+      if (ascii_header_get(conf->hdrbuf_in, "UTC_START", "%s", conf->utc_start) < 0)  
+	{
+	  multilog(runtime_log, LOG_ERR, "failed ascii_header_get UTC_START\n");
+	  fprintf(stderr, "Error getting UTC_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	  return EXIT_FAILURE;
+	}
+      fprintf(stdout, "\nGet UTC_START at process stage:\t\t%s\n", conf->utc_start);
+      
+      /* Get picoseconds from hdrin */
+      if (ascii_header_get(conf->hdrbuf_in, "PICOSECONDS", "%"PRIu64, &(conf->picoseconds)) < 0)  
+	{
+	  multilog(runtime_log, LOG_ERR, "failed ascii_header_get PICOSECONDS\n");
+	  fprintf(stderr, "Error getting PICOSECONDS, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	  return EXIT_FAILURE;
+	}
+      fprintf(stdout, "Get PICOSECONDS at process stage:\t%"PRIu64"\n", conf->picoseconds);
+      
+      /* Get frequency from hdrin */
+      if (ascii_header_get(conf->hdrbuf_in, "FREQ", "%lf", &freq) < 0)   // RA and DEC also need to pass from hdrin to hdrout
+	{
+	  multilog(runtime_log, LOG_ERR, "failed ascii_header_get FREQ\n");
+	  fprintf(stderr, "Error getting FREQ, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	  return EXIT_FAILURE;
+	}
       if(FOLD_MODE)
 	{
 	  if (fileread(conf->hfname, conf->hdrbuf_out_fold, DADA_HDR_SIZE) < 0)
 	    {
 	      multilog(runtime_log, LOG_ERR, "cannot read header from %s\n", conf->hfname);
 	      fprintf(stderr, "Error reading header file, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	      return EXIT_FAILURE;
+	    }
+
+	  /* Pass utc_start */
+	  if (ascii_header_set(conf->hdrbuf_out_fold, "UTC_START", "%s", conf->utc_start) < 0)  
+	    {
+	      multilog(runtime_log, LOG_ERR, "failed ascii_header_set UTC_START\n");
+	      fprintf(stderr, "Error setting UTC_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	      return EXIT_FAILURE;
+	    }	  
+	  fprintf(stdout, "Set UTC_START at process stage:\t\t%s\n", conf->utc_start);
+	  multilog(runtime_log, LOG_INFO, "UTC_START:\t%s\n", conf->utc_start);
+
+	  /* Pass picoseconds */
+	  if (ascii_header_set(conf->hdrbuf_out_fold, "PICOSECONDS", "%"PRIu64, conf->picoseconds) < 0)  
+	    {
+	      multilog(runtime_log, LOG_ERR, "failed ascii_header_set PICOSECONDS\n");
+	      fprintf(stderr, "Error setting PICOSECONDS, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	      return EXIT_FAILURE;
+	    }	  
+	  fprintf(stdout, "Set PICOSECONDS at process stage:\t%"PRIu64"\n\n", conf->picoseconds);
+	  multilog(runtime_log, LOG_INFO, "PICOSECONDS:\t%"PRIu64"\n", conf->picoseconds);
+
+	  /* Pass frequency */
+	  if (ascii_header_set(conf->hdrbuf_out_fold, "FREQ", "%.1lf", freq) < 0)  
+	    {
+	      multilog(runtime_log, LOG_ERR, "failed ascii_header_set FREQ\n");
+	      fprintf(stderr, "Error setting FREQ, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	      return EXIT_FAILURE;
 	    }
 	}
@@ -920,85 +977,28 @@ int register_header(conf_t *conf)
 	      fprintf(stderr, "Error reading header file, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	      return EXIT_FAILURE;
 	    }
-	}
-      
-      /* Pass utc_start from hdrin to hdrout */
-      if (ascii_header_get(conf->hdrbuf_in, "UTC_START", "%s", conf->utc_start) < 0)  
-	{
-	  multilog(runtime_log, LOG_ERR, "failed ascii_header_get UTC_START\n");
-	  fprintf(stderr, "Error getting UTC_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	  return EXIT_FAILURE;
-	}
-      fprintf(stdout, "\nGet UTC_START at process stage:\t\t%s\n", conf->utc_start);
-      if(FOLD_MODE)
-	{
-	  if (ascii_header_set(conf->hdrbuf_out_fold, "UTC_START", "%s", conf->utc_start) < 0)  
-	    {
-	      multilog(runtime_log, LOG_ERR, "failed ascii_header_get UTC_START\n");
-	      fprintf(stderr, "Error setting UTC_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	      return EXIT_FAILURE;
-	    }
-	}
-      else
-	{
+	  
+	  /* Pass utc_start */
 	  if (ascii_header_set(conf->hdrbuf_out_search, "UTC_START", "%s", conf->utc_start) < 0)  
 	    {
-	      multilog(runtime_log, LOG_ERR, "failed ascii_header_get UTC_START\n");
+	      multilog(runtime_log, LOG_ERR, "failed ascii_header_set UTC_START\n");
 	      fprintf(stderr, "Error setting UTC_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	      return EXIT_FAILURE;
 	    }
-	}
-	
-      fprintf(stdout, "Set UTC_START at process stage:\t\t%s\n", conf->utc_start);
-      multilog(runtime_log, LOG_INFO, "UTC_START:\t%s\n", conf->utc_start);
-      
-      /* Pass picoseconds from hdrin to hdrout */
-      if (ascii_header_get(conf->hdrbuf_in, "PICOSECONDS", "%"PRIu64, &(conf->picoseconds)) < 0)  
-	{
-	  multilog(runtime_log, LOG_ERR, "failed ascii_header_get PICOSECONDS\n");
-	  fprintf(stderr, "Error getting PICOSECONDS, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	  return EXIT_FAILURE;
-	}
-      fprintf(stdout, "Get PICOSECONDS at process stage:\t%"PRIu64"\n", conf->picoseconds);
-      if(FOLD_MODE)
-	{
-	  if (ascii_header_set(conf->hdrbuf_out_fold, "PICOSECONDS", "%"PRIu64, conf->picoseconds) < 0)  
-	    {
-	      multilog(runtime_log, LOG_ERR, "failed ascii_header_get PICOSECONDS\n");
-	      fprintf(stderr, "Error setting PICOSECONDS, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	      return EXIT_FAILURE;
-	    }
-	}
-      else	
-	{
+	  fprintf(stdout, "Set UTC_START at process stage:\t\t%s\n", conf->utc_start);
+	  multilog(runtime_log, LOG_INFO, "UTC_START:\t%s\n", conf->utc_start);
+
+	  /* Pass picoseconds */
 	  if (ascii_header_set(conf->hdrbuf_out_search, "PICOSECONDS", "%"PRIu64, conf->picoseconds) < 0)  
 	    {
-	      multilog(runtime_log, LOG_ERR, "failed ascii_header_get PICOSECONDS\n");
+	      multilog(runtime_log, LOG_ERR, "failed ascii_header_set PICOSECONDS\n");
 	      fprintf(stderr, "Error setting PICOSECONDS, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	      return EXIT_FAILURE;
 	    }
-	}
-      fprintf(stdout, "Set PICOSECONDS at process stage:\t%"PRIu64"\n\n", conf->picoseconds);
-      multilog(runtime_log, LOG_INFO, "PICOSECONDS:\t%"PRIu64"\n", conf->picoseconds);
-      
-      /* Pass frequency from hdrin to hdrout */
-      if (ascii_header_get(conf->hdrbuf_in, "FREQ", "%lf", &freq) < 0)   // RA and DEC also need to pass from hdrin to hdrout
-	{
-	  multilog(runtime_log, LOG_ERR, "failed ascii_header_get FREQ\n");
-	  fprintf(stderr, "Error getting FREQ, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	  return EXIT_FAILURE;
-	}
-      if(FOLD_MODE)
-	{
-	  if (ascii_header_set(conf->hdrbuf_out_fold, "FREQ", "%.1lf", freq) < 0)  
-	    {
-	      multilog(runtime_log, LOG_ERR, "failed ascii_header_get FREQ\n");
-	      fprintf(stderr, "Error setting FREQ, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	      return EXIT_FAILURE;
-	    }
-	}
-      else	
-	{
+	  fprintf(stdout, "Set PICOSECONDS at process stage:\t%"PRIu64"\n\n", conf->picoseconds);
+	  multilog(runtime_log, LOG_INFO, "PICOSECONDS:\t%"PRIu64"\n", conf->picoseconds);
+	  
+	  /* Pass freq */
 	  if (ascii_header_set(conf->hdrbuf_out_search, "FREQ", "%.1lf", freq) < 0)  
 	    {
 	      multilog(runtime_log, LOG_ERR, "failed ascii_header_get FREQ\n");
@@ -1008,27 +1008,17 @@ int register_header(conf_t *conf)
 	}
     }
   else
-    {
+    {      
+      if (ascii_header_get(conf->hdrbuf_in, "UTC_START", "%s", conf->utc_start) < 0)  
+	{
+	  multilog(runtime_log, LOG_ERR, "failed ascii_header_get UTC_START\n");
+	  fprintf(stderr, "Error getting UTC_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
+	  return EXIT_FAILURE;
+	}
       if(FOLD_MODE)
-	{
-	  memcpy(conf->hdrbuf_out_fold, conf->hdrbuf_in, DADA_HDR_SIZE);
-	  if (ascii_header_get(conf->hdrbuf_in, "UTC_START", "%s", conf->utc_start) < 0)  
-	    {
-	  multilog(runtime_log, LOG_ERR, "failed ascii_header_get UTC_START\n");
-	  fprintf(stderr, "Error getting UTC_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	  return EXIT_FAILURE;
-	    }
-	}
+	memcpy(conf->hdrbuf_out_fold, conf->hdrbuf_in, DADA_HDR_SIZE);
       else	
-	{
-	  memcpy(conf->hdrbuf_out_search, conf->hdrbuf_in, DADA_HDR_SIZE);
-	  if (ascii_header_get(conf->hdrbuf_in, "UTC_START", "%s", conf->utc_start) < 0)  
-	    {
-	  multilog(runtime_log, LOG_ERR, "failed ascii_header_get UTC_START\n");
-	  fprintf(stderr, "Error getting UTC_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
-	  return EXIT_FAILURE;
-	    }
-	}
+	memcpy(conf->hdrbuf_out_search, conf->hdrbuf_in, DADA_HDR_SIZE);
     }
   
   if(ipcbuf_mark_cleared (conf->hdu_in->header_block))  // We are the only one reader, so that we can clear it after read;
