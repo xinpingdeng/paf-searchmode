@@ -16,7 +16,7 @@
 #include "paf_process.cuh"
 
 #define CUFFT_NX32
-#define FOLD_MODE             1
+#define FOLD_MODE             0
 
 #define DADA_HDR_SIZE         4096
 #define NCHK_NIC              48   // How many frequency chunks we will receive, we should read the number from metadata

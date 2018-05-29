@@ -77,11 +77,12 @@ int init_process(conf_t *conf)
   
   conf->sbufin_size         = conf->ndata1 * NBYTE_IN;
   conf->sbufout_size_fold   = conf->ndata2 * NBYTE_OUT_FOLD;
-  conf->sbufout_size_search = conf->ndata2 * NBYTE_OUT_SEARCH;
+  conf->sbufout_size_search = conf->ndata3 * NBYTE_OUT_SEARCH;
   
   conf->bufin_size          = conf->nstream * conf->sbufin_size;
   conf->bufout_size_fold    = conf->nstream * conf->sbufout_size_fold;
   conf->bufout_size_search  = conf->nstream * conf->sbufout_size_search;
+  //fprintf(stdout, "%ld", conf->bufout_size_search);
   
   conf->sbufrt1_size = conf->npol1 * NBYTE_RT;
   conf->sbufrt2_size = conf->npol2 * NBYTE_RT;
@@ -545,6 +546,7 @@ int do_process(conf_t conf)
 		{
 		  swap_select_transpose_kernel<<<gridsize_swap_select_transpose, blocksize_swap_select_transpose, 0, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], conf.nsamp1, conf.nsamp2); 		  
 		  add_detect_scale_kernel<<<gridsize_add_detect_scale, blocksize_add_detect_scale, 0, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out_search[dbufout_offset_search], conf.nsamp2, conf.ddat_offs_search, conf.ddat_scl_search);
+
 		  CudaSafeCall(cudaMemcpyAsync(&conf.hdu_out_search->data_block->curbuf[hbufout_offset_search], &conf.dbuf_out_search[dbufout_offset_search], conf.sbufout_size_search, cudaMemcpyDeviceToHost, conf.streams[j]));
 		}
 	    }

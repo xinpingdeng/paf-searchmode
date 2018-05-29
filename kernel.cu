@@ -238,8 +238,10 @@ __global__ void mean_kernel(cufftComplex *buf_rt1, size_t offset_rt1, float *dda
 __global__ void scale_kernel(float *ddat_offs, float *dsquare_mean, float *ddat_scl)
 {
   size_t loc_freq = threadIdx.x;
-  
-  ddat_scl[loc_freq] = SCL_NSIG * sqrtf(dsquare_mean[loc_freq] - ddat_offs[loc_freq] * ddat_offs[loc_freq]) / SCL_INT8;
+  if(FOLD_MODE)
+    ddat_scl[loc_freq] = SCL_NSIG * sqrtf(dsquare_mean[loc_freq] - ddat_offs[loc_freq] * ddat_offs[loc_freq]) / SCL_INT8;
+  else
+    ddat_scl[loc_freq] = SCL_NSIG * sqrtf(dsquare_mean[loc_freq] - ddat_offs[loc_freq] * ddat_offs[loc_freq]) / SCL_UINT8;
 }
 
 /*
