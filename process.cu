@@ -26,15 +26,20 @@ int init_process(conf_t *conf)
   ipcbuf_t *db = NULL;
   
   /* Prepare buffer, stream and fft plan for process */
-  conf->scl_ndim_fold    = conf->rbufin_ndf * NSAMP_DF * NPOL_SAMP * NDIM_POL;
-  conf->nsamp1      = conf->stream_ndf * NCHK_NIC * NCHAN_CHK * NSAMP_DF;
-  conf->npol1       = conf->nsamp1 * NPOL_SAMP;
-  conf->ndata1      = conf->npol1  * NDIM_POL;
+  conf->sclndim_fold = conf->rbufin_ndf * NSAMP_DF * NPOL_SAMP * NDIM_POL; // Only works when two polarisations has similar power level
+  conf->nsamp1       = conf->stream_ndf * NCHK_NIC * NCHAN_CHK * NSAMP_DF;
+  conf->npol1        = conf->nsamp1 * NPOL_SAMP;
+  conf->ndata1       = conf->npol1  * NDIM_POL;
+		     
+  conf->nsamp2       = conf->nsamp1 * OSAMP_RATEI / NCHAN_RATEI;
+  conf->npol2        = conf->nsamp2 * NPOL_SAMP;
+  conf->ndata2       = conf->npol2  * NDIM_POL;
 
-  conf->nsamp2      = conf->nsamp1 * OSAMP_RATEI / NCHAN_RATEI;
-  conf->npol2       = conf->nsamp2 * NPOL_SAMP;
-  conf->ndata2      = conf->npol2  * NDIM_POL;
-  
+  conf->sclndim_search = conf->rbufin_ndf * NSAMP_DF / CUFFT_NX1;   // We do not average in time and here we work on detected data;
+  conf->nsamp3         = conf->nsamp2 * NCHAN_SEARCH / NCHAN_KEEP2;
+  conf->npol3          = conf->nsamp3;
+  conf->ndata3         = conf->nsamp3;  
+    
   nx1        = CUFFT_NX1;
   batch1     = conf->npol1 / CUFFT_NX1;
   
@@ -70,11 +75,11 @@ int init_process(conf_t *conf)
       CufftSafeCall(cufftSetStream(conf->fft_plans2[i], conf->streams[i]));
     }
   
-  conf->sbufin_size  = conf->ndata1 * NBYTE_IN;
-  conf->sbufout_size = conf->ndata2 * NBYTE_OUT;
+  conf->sbufin_size       = conf->ndata1 * NBYTE_IN;
+  conf->sbufout_size_fold = conf->ndata2 * NBYTE_OUT;
   
-  conf->bufin_size   = conf->nstream * conf->sbufin_size;
-  conf->bufout_size  = conf->nstream * conf->sbufout_size;
+  conf->bufin_size        = conf->nstream * conf->sbufin_size;
+  conf->bufout_size_fold  = conf->nstream * conf->sbufout_size_fold;
   
   conf->sbufrt1_size = conf->npol1 * NBYTE_RT;
   conf->sbufrt2_size = conf->npol2 * NBYTE_RT;
@@ -86,12 +91,12 @@ int init_process(conf_t *conf)
   conf->bufrt1_offset = conf->sbufrt1_size / sizeof(cufftComplex);
   conf->bufrt2_offset = conf->sbufrt2_size / sizeof(cufftComplex);
   
-  conf->dbufout_offset = conf->sbufout_size / sizeof(int8_t);
-  //conf->dbufout_offset = conf->sbufout_size / sizeof(float);
-  conf->hbufout_offset = conf->sbufout_size / sizeof(char);
+  conf->dbufout_offset_fold = conf->sbufout_size_fold / sizeof(int8_t);
+  //conf->dbufout_offset_fold = conf->sbufout_size_fold / sizeof(float);
+  conf->hbufout_offset_fold = conf->sbufout_size_fold / sizeof(char);
   	  
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_in, conf->bufin_size));   
-  CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out, conf->bufout_size)); 
+  CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out_fold, conf->bufout_size_fold)); 
 
   CudaSafeCall(cudaMalloc((void **)&conf->ddat_offs, NCHAN_FOLD * sizeof(float)));
   CudaSafeCall(cudaMalloc((void **)&conf->dsquare_mean, NCHAN_FOLD * sizeof(float)));
@@ -280,24 +285,24 @@ int init_process(conf_t *conf)
     }
 
   /* Prepare output ring buffer */  
-  conf->hdu_out = dada_hdu_create(runtime_log);
-  dada_hdu_set_key(conf->hdu_out, conf->key_out);
-  if(dada_hdu_connect(conf->hdu_out) < 0)
+  conf->hdu_out_fold = dada_hdu_create(runtime_log);
+  dada_hdu_set_key(conf->hdu_out_fold, conf->key_out_fold);
+  if(dada_hdu_connect(conf->hdu_out_fold) < 0)
     {
       multilog(runtime_log, LOG_ERR, "could not connect to hdu\n");
       fprintf(stderr, "Can not connect to hdu, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;    
     }
-  db = (ipcbuf_t *) conf->hdu_out->data_block;
-  conf->rbufout_size = ipcbuf_get_bufsz(db);
-  if(conf->rbufout_size % conf->bufout_size != 0)  
+  db = (ipcbuf_t *) conf->hdu_out_fold->data_block;
+  conf->rbufout_size_fold = ipcbuf_get_bufsz(db);
+  if(conf->rbufout_size_fold % conf->bufout_size_fold != 0)  
     {
       multilog(runtime_log, LOG_ERR, "data buffer size mismatch\n");
       fprintf(stderr, "Buffer size mismatch, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
       return EXIT_FAILURE;    
     }
   
-  conf->hdrsz = ipcbuf_get_bufsz(conf->hdu_out->header_block);  
+  conf->hdrsz = ipcbuf_get_bufsz(conf->hdu_out_fold->header_block);  
   if(conf->hdrsz != DADA_HDR_SIZE)    // This number should match
     {
       multilog(runtime_log, LOG_ERR, "data buffer size mismatch\n");
@@ -305,7 +310,7 @@ int init_process(conf_t *conf)
       return EXIT_FAILURE;    
     }  
   /* make ourselves the write client */
-  if(dada_hdu_lock_write(conf->hdu_out) < 0)
+  if(dada_hdu_lock_write(conf->hdu_out_fold) < 0)
     {
       multilog(runtime_log, LOG_ERR, "open_hdu: could not lock write\n");
       fprintf(stderr, "Error locking HDU, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -361,7 +366,7 @@ int do_process(conf_t conf)
     4. Add the data in frequency to get NCHAN_SEARCH channels, detect the added data and scale it;
   */
   size_t i, j;
-  size_t hbufin_offset, dbufin_offset, bufrt1_offset, bufrt2_offset, hbufout_offset, dbufout_offset;
+  size_t hbufin_offset, dbufin_offset, bufrt1_offset, bufrt2_offset, hbufout_offset_fold, dbufout_offset_fold;
   dim3 gridsize_unpack, blocksize_unpack;
   dim3 gridsize_swap_select_transpose_swap, blocksize_swap_select_transpose_swap;
   dim3 gridsize_transpose_scale3, blocksize_transpose_scale3;
@@ -398,7 +403,7 @@ int do_process(conf_t conf)
   clock_gettime(CLOCK_REALTIME, &start);
 #endif
 
-  conf.hdu_out->data_block->curbuf = ipcio_open_block_write(conf.hdu_out->data_block, &block_id);   /* Open buffer to write */
+  conf.hdu_out_fold->data_block->curbuf = ipcio_open_block_write(conf.hdu_out_fold->data_block, &block_id);   /* Open buffer to write */
   
   while(conf.hdu_in->data_block->curbufsz == conf.rbufin_size)
     // The first time we open a block at the scale calculation, we need to make sure that the input ring buffer block is bigger than the block needed for scale calculation
@@ -428,8 +433,8 @@ int do_process(conf_t conf)
 	      bufrt1_offset = j * conf.bufrt1_offset;
 	      bufrt2_offset = j * conf.bufrt2_offset;
 	      
-	      dbufout_offset = j * conf.dbufout_offset;
-	      hbufout_offset = j * conf.hbufout_offset + i * conf.bufout_size;
+	      dbufout_offset_fold = j * conf.dbufout_offset_fold;
+	      hbufout_offset_fold = j * conf.hbufout_offset_fold + i * conf.bufout_size_fold;
 	      
 	      /* Copy data into device */
 #ifdef DEBUG
@@ -459,12 +464,12 @@ int do_process(conf_t conf)
 	      CufftSafeCall(cufftExecC2C(conf.fft_plans2[j], &conf.buf_rt2[bufrt2_offset], &conf.buf_rt2[bufrt2_offset], CUFFT_INVERSE));
 	      
 	      /* Get final output */
-	      //transpose_scale_kernel3<<<gridsize_transpose_scale3, blocksize_transpose_scale3, 0, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.scale);  
-	      transpose_scale_kernel4<<<gridsize_transpose_scale4, blocksize_transpose_scale4, 0, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2, conf.ddat_offs, conf.ddat_scl);   
-	      //transpose_float_kernel<<<gridsize_transpose_float, blocksize_transpose_float, 0, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out[dbufout_offset], conf.nsamp2);   
+	      //transpose_scale_kernel3<<<gridsize_transpose_scale3, blocksize_transpose_scale3, 0, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out_fold[dbufout_offset_fold], conf.nsamp2, conf.scale);  
+	      transpose_scale_kernel4<<<gridsize_transpose_scale4, blocksize_transpose_scale4, 0, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out_fold[dbufout_offset_fold], conf.nsamp2, conf.ddat_offs, conf.ddat_scl);   
+	      //transpose_float_kernel<<<gridsize_transpose_float, blocksize_transpose_float, 0, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out_fold[dbufout_offset_fold], conf.nsamp2);   
 	      
 	      /* Copy the final output to host */
-	      CudaSafeCall(cudaMemcpyAsync(&conf.hdu_out->data_block->curbuf[hbufout_offset], &conf.dbuf_out[dbufout_offset], conf.sbufout_size, cudaMemcpyDeviceToHost, conf.streams[j]));
+	      CudaSafeCall(cudaMemcpyAsync(&conf.hdu_out_fold->data_block->curbuf[hbufout_offset_fold], &conf.dbuf_out_fold[dbufout_offset_fold], conf.sbufout_size_fold, cudaMemcpyDeviceToHost, conf.streams[j]));
 	      
 	      //CudaSafeCall(cudaStreamSynchronize(conf.streams[j])); // Sync here equal to single stream
 	    }
@@ -483,13 +488,13 @@ int do_process(conf_t conf)
 #endif      
 	  
       /* Close current buffer */
-      if(ipcio_close_block_write(conf.hdu_out->data_block, conf.rbufout_size) < 0)
+      if(ipcio_close_block_write(conf.hdu_out_fold->data_block, conf.rbufout_size_fold) < 0)
 	{
 	  multilog (runtime_log, LOG_ERR, "close_buffer: ipcio_close_block_write failed\n");
 	  fprintf(stderr, "close_buffer: ipcio_close_block_write failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	  return EXIT_FAILURE;
 	}
-      conf.hdu_out->data_block->curbuf = ipcio_open_block_write(conf.hdu_out->data_block, &block_id);   /* Open buffer to write */
+      conf.hdu_out_fold->data_block->curbuf = ipcio_open_block_write(conf.hdu_out_fold->data_block, &block_id);   /* Open buffer to write */
 	  
 #ifdef DEBUG
       clock_gettime(CLOCK_REALTIME, &stop);
@@ -506,7 +511,7 @@ int do_process(conf_t conf)
 
   ipcio_close_block_read(conf.hdu_in->data_block, conf.hdu_in->data_block->curbufsz);
   
-  if (ipcio_close_block_write(conf.hdu_out->data_block, conf.rbufout_size) < 0)
+  if (ipcio_close_block_write(conf.hdu_out_fold->data_block, conf.rbufout_size_fold) < 0)
     {
       multilog (runtime_log, LOG_ERR, "close_buffer: ipcio_close_block_write failed\n");
       fprintf(stderr, "close_buffer: ipcio_close_block_write failed, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -637,7 +642,7 @@ int dat_offs_scl(conf_t conf)
 	}
       CudaSynchronizeCall(); // Sync here is for multiple streams
 
-      mean_kernel<<<gridsize_mean_fold, blocksize_mean_fold>>>(conf.buf_rt1, conf.bufrt1_offset, conf.ddat_offs, conf.dsquare_mean, conf.nstream, conf.scl_ndim_fold);
+      mean_kernel<<<gridsize_mean_fold, blocksize_mean_fold>>>(conf.buf_rt1, conf.bufrt1_offset, conf.ddat_offs, conf.dsquare_mean, conf.nstream, conf.sclndim_fold);
     }
   
   /* Get the scale of each chanel */
@@ -648,7 +653,7 @@ int dat_offs_scl(conf_t conf)
   CudaSafeCall(cudaEventRecord(stop_event));
   CudaSafeCall(cudaEventSynchronize(stop_event));
   CudaSafeCall(cudaEventElapsedTime(&elapsed_event, start_event, stop_event));
-  fprintf(stdout, "elapsed time to get scale with %.0f data is %f s\n", conf.scl_ndim_fold, elapsed_event/1.0E3);
+  fprintf(stdout, "elapsed time to get scale with %.0f data is %f s\n", conf.sclndim_fold, elapsed_event/1.0E3);
 #endif
   
   CudaSafeCall(cudaMemcpy(conf.hdat_offs, conf.ddat_offs, sizeof(float) * NCHAN_FOLD, cudaMemcpyDeviceToHost));
@@ -689,7 +694,7 @@ int destroy_process(conf_t conf)
     }
   
   cudaFree(conf.dbuf_in);
-  cudaFree(conf.dbuf_out);
+  cudaFree(conf.dbuf_out_fold);
 
   cudaFreeHost(conf.hdat_offs);
   cudaFreeHost(conf.hsquare_mean);
@@ -704,9 +709,9 @@ int destroy_process(conf_t conf)
 
   dada_cuda_dbunregister(conf.hdu_in);
   
-  dada_hdu_unlock_write(conf.hdu_out);
-  dada_hdu_disconnect(conf.hdu_out);
-  dada_hdu_destroy(conf.hdu_out);
+  dada_hdu_unlock_write(conf.hdu_out_fold);
+  dada_hdu_disconnect(conf.hdu_out_fold);
+  dada_hdu_destroy(conf.hdu_out_fold);
 
   dada_hdu_unlock_read(conf.hdu_in);
   dada_hdu_disconnect(conf.hdu_in);
@@ -738,8 +743,8 @@ int register_header(conf_t *conf)
       return EXIT_FAILURE;
     }
 
-  conf->hdrbuf_out = ipcbuf_get_next_write(conf->hdu_out->header_block);
-  if (!conf->hdrbuf_out)
+  conf->hdrbuf_out_fold = ipcbuf_get_next_write(conf->hdu_out_fold->header_block);
+  if (!conf->hdrbuf_out_fold)
     {
       multilog(runtime_log, LOG_ERR, "get next header block error.\n");
       fprintf(stderr, "Error getting header_buf, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -748,7 +753,7 @@ int register_header(conf_t *conf)
   
   if(conf->stream)
     {
-      if (fileread(conf->hfname, conf->hdrbuf_out, DADA_HDR_SIZE) < 0)
+      if (fileread(conf->hfname, conf->hdrbuf_out_fold, DADA_HDR_SIZE) < 0)
 	{
 	  multilog(runtime_log, LOG_ERR, "cannot read header from %s\n", conf->hfname);
 	  fprintf(stderr, "Error reading header file, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -763,7 +768,7 @@ int register_header(conf_t *conf)
 	  return EXIT_FAILURE;
 	}
       fprintf(stdout, "\nGet UTC_START at process stage:\t\t%s\n", conf->utc_start);
-      if (ascii_header_set(conf->hdrbuf_out, "UTC_START", "%s", conf->utc_start) < 0)  
+      if (ascii_header_set(conf->hdrbuf_out_fold, "UTC_START", "%s", conf->utc_start) < 0)  
 	{
 	  multilog(runtime_log, LOG_ERR, "failed ascii_header_get UTC_START\n");
 	  fprintf(stderr, "Error setting UTC_START, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -780,7 +785,7 @@ int register_header(conf_t *conf)
 	  return EXIT_FAILURE;
 	}
       fprintf(stdout, "Get PICOSECONDS at process stage:\t%"PRIu64"\n", conf->picoseconds);
-      if (ascii_header_set(conf->hdrbuf_out, "PICOSECONDS", "%"PRIu64, conf->picoseconds) < 0)  
+      if (ascii_header_set(conf->hdrbuf_out_fold, "PICOSECONDS", "%"PRIu64, conf->picoseconds) < 0)  
 	{
 	  multilog(runtime_log, LOG_ERR, "failed ascii_header_get PICOSECONDS\n");
 	  fprintf(stderr, "Error setting PICOSECONDS, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -796,7 +801,7 @@ int register_header(conf_t *conf)
 	  fprintf(stderr, "Error getting FREQ, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
 	  return EXIT_FAILURE;
 	}
-      if (ascii_header_set(conf->hdrbuf_out, "FREQ", "%.1lf", freq) < 0)  
+      if (ascii_header_set(conf->hdrbuf_out_fold, "FREQ", "%.1lf", freq) < 0)  
 	{
 	  multilog(runtime_log, LOG_ERR, "failed ascii_header_get FREQ\n");
 	  fprintf(stderr, "Error setting FREQ, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);
@@ -805,7 +810,7 @@ int register_header(conf_t *conf)
     }
   else
     {
-      memcpy(conf->hdrbuf_out, conf->hdrbuf_in, DADA_HDR_SIZE);
+      memcpy(conf->hdrbuf_out_fold, conf->hdrbuf_in, DADA_HDR_SIZE);
       if (ascii_header_get(conf->hdrbuf_in, "UTC_START", "%s", conf->utc_start) < 0)  
 	{
 	  multilog(runtime_log, LOG_ERR, "failed ascii_header_get UTC_START\n");
@@ -822,7 +827,7 @@ int register_header(conf_t *conf)
     }
 
   /* donot set header parameters anymore - acqn. doesn't start */
-  if (ipcbuf_mark_filled (conf->hdu_out->header_block, conf->hdrsz) < 0)
+  if (ipcbuf_mark_filled (conf->hdu_out_fold->header_block, conf->hdrsz) < 0)
     {
       multilog(runtime_log, LOG_ERR, "Could not mark filled header block\n");
       fprintf(stderr, "Error header_fill, which happens at \"%s\", line [%d].\n", __FILE__, __LINE__);

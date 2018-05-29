@@ -247,7 +247,7 @@ __global__ void scale_kernel(float *ddat_offs, float *dsquare_mean, float *ddat_
   1. reorder data from PTFT to TFP;
   2. scale it to required range
 */
-__global__ void transpose_scale_kernel(cufftComplex *dbuf_rt2, int8_t *dbuf_out, size_t offset_rt2, int scale)
+__global__ void transpose_scale_kernel(cufftComplex *dbuf_rt2, int8_t *dbuf_out_fold, size_t offset_rt2, int scale)
 {
   size_t loc_rt2, loc_out, loc;
   cufftComplex p1, p2;
@@ -259,17 +259,17 @@ __global__ void transpose_scale_kernel(cufftComplex *dbuf_rt2, int8_t *dbuf_out,
   p1 = dbuf_rt2[loc_rt2];
   p2 = dbuf_rt2[loc_rt2 + offset_rt2];
 
-  dbuf_out[loc_out]     = __float2int_rz(p1.x) >> scale;
-  dbuf_out[loc_out + 1] = __float2int_rz(p1.y) >> scale;
-  dbuf_out[loc_out + 2] = __float2int_rz(p2.x) >> scale;
-  dbuf_out[loc_out + 3] = __float2int_rz(p2.y) >> scale;
+  dbuf_out_fold[loc_out]     = __float2int_rz(p1.x) >> scale;
+  dbuf_out_fold[loc_out + 1] = __float2int_rz(p1.y) >> scale;
+  dbuf_out_fold[loc_out + 2] = __float2int_rz(p2.x) >> scale;
+  dbuf_out_fold[loc_out + 3] = __float2int_rz(p2.y) >> scale;
 }
 
 ///*
 //  This is a speedup version of previous kernel. It has better profermance with long time series. It uses share memory to get the speedup.
 //  However, the speedup here only works with input array.
 //*/
-//__global__ void transpose_scale_kernel2(cufftComplex *dbuf_rt2, int8_t *dbuf_out, size_t offset_rt2, int scale)
+//__global__ void transpose_scale_kernel2(cufftComplex *dbuf_rt2, int8_t *dbuf_out_fold, size_t offset_rt2, int scale)
 //{
 //  __shared__ int8_t tile[NPOL_SAMP * NDIM_POL][NCHAN_FOLD][CUFFT_NX2]; // Here we have bank conflict problem, need more time to fix it.
 //
@@ -303,10 +303,10 @@ __global__ void transpose_scale_kernel(cufftComplex *dbuf_rt2, int8_t *dbuf_out,
 //      y = threadIdx.y + i;
 //
 //      loc_out = (loc + x * NCHAN_FOLD  + y) * NPOL_SAMP * NDIM_POL;
-//      dbuf_out[loc_out]     = tile[0][y][x];
-//      dbuf_out[loc_out + 1] = tile[1][y][x];
-//      dbuf_out[loc_out + 2] = tile[2][y][x];
-//      dbuf_out[loc_out + 3] = tile[3][y][x];
+//      dbuf_out_fold[loc_out]     = tile[0][y][x];
+//      dbuf_out_fold[loc_out + 1] = tile[1][y][x];
+//      dbuf_out_fold[loc_out + 2] = tile[2][y][x];
+//      dbuf_out_fold[loc_out + 3] = tile[3][y][x];
 //    }
 //}
 
@@ -317,7 +317,7 @@ __global__ void transpose_scale_kernel(cufftComplex *dbuf_rt2, int8_t *dbuf_out,
 //  Need more time to fix it and get the best speed.
 //  Leave it for now
 //*/
-//__global__ void transpose_scale_kernel3(cufftComplex *dbuf_rt2, int8_t *dbuf_out, size_t offset_rt2, int scale)
+//__global__ void transpose_scale_kernel3(cufftComplex *dbuf_rt2, int8_t *dbuf_out_fold, size_t offset_rt2, int scale)
 //{
 //  __shared__ int8_t tile[NPOL_SAMP * NDIM_POL][TILE_DIM][TILE_DIM];
 //
@@ -355,17 +355,17 @@ __global__ void transpose_scale_kernel(cufftComplex *dbuf_rt2, int8_t *dbuf_out,
 //      y = threadIdx.y + i;
 //      loc_out = (loc + y * gridDim.y * blockDim.x) * NPOL_SAMP * NDIM_POL;
 //      
-//      dbuf_out[loc_out]     = tile[0][x][y];
-//      dbuf_out[loc_out + 1] = tile[1][x][y];
-//      dbuf_out[loc_out + 2] = tile[2][x][y];
-//      dbuf_out[loc_out + 3] = tile[3][x][y];
+//      dbuf_out_fold[loc_out]     = tile[0][x][y];
+//      dbuf_out_fold[loc_out + 1] = tile[1][x][y];
+//      dbuf_out_fold[loc_out + 2] = tile[2][x][y];
+//      dbuf_out_fold[loc_out + 3] = tile[3][x][y];
 //    }
 //}
 
 /* 
    This is the speedup version with dat_scl and dat_offs calculated from data
 */
-__global__ void transpose_scale_kernel4(cufftComplex *dbuf_rt2, int8_t *dbuf_out, size_t offset_rt2, float *ddat_offs, float *ddat_scl)
+__global__ void transpose_scale_kernel4(cufftComplex *dbuf_rt2, int8_t *dbuf_out_fold, size_t offset_rt2, float *ddat_offs, float *ddat_scl)
 {
   // For 27 seconds data, 64-point FFT option needs around 720 ms
   // 32-point FFT option needs around 520ms
@@ -407,17 +407,17 @@ __global__ void transpose_scale_kernel4(cufftComplex *dbuf_rt2, int8_t *dbuf_out
       y = threadIdx.y + i;
       loc_out = (loc + y * gridDim.y * blockDim.x) * NPOL_SAMP * NDIM_POL;
       
-      dbuf_out[loc_out]     = tile[0][x][y];
-      dbuf_out[loc_out + 1] = tile[1][x][y];
-      dbuf_out[loc_out + 2] = tile[2][x][y];
-      dbuf_out[loc_out + 3] = tile[3][x][y];
+      dbuf_out_fold[loc_out]     = tile[0][x][y];
+      dbuf_out_fold[loc_out + 1] = tile[1][x][y];
+      dbuf_out_fold[loc_out + 2] = tile[2][x][y];
+      dbuf_out_fold[loc_out + 3] = tile[3][x][y];
     }
 }
 
 ///* 
 //   This kernel can be used to record float data without scaling;
 //*/
-//__global__ void transpose_float_kernel(cufftComplex *dbuf_rt2, float *dbuf_out, size_t offset_rt2)
+//__global__ void transpose_float_kernel(cufftComplex *dbuf_rt2, float *dbuf_out_fold, size_t offset_rt2)
 //{
 //  __shared__ float tile[NPOL_SAMP * NDIM_POL][TILE_DIM][TILE_DIM];
 //
@@ -455,10 +455,10 @@ __global__ void transpose_scale_kernel4(cufftComplex *dbuf_rt2, int8_t *dbuf_out
 //      y = threadIdx.y + i;
 //      loc_out = (loc + y * gridDim.y * blockDim.x) * NPOL_SAMP * NDIM_POL;
 //      
-//      dbuf_out[loc_out]     = tile[0][x][y];
-//      dbuf_out[loc_out + 1] = tile[1][x][y];
-//      dbuf_out[loc_out + 2] = tile[2][x][y];
-//      dbuf_out[loc_out + 3] = tile[3][x][y];
+//      dbuf_out_fold[loc_out]     = tile[0][x][y];
+//      dbuf_out_fold[loc_out + 1] = tile[1][x][y];
+//      dbuf_out_fold[loc_out + 2] = tile[2][x][y];
+//      dbuf_out_fold[loc_out + 3] = tile[3][x][y];
 //    }
 //}
 
@@ -467,7 +467,7 @@ __global__ void transpose_scale_kernel4(cufftComplex *dbuf_rt2, int8_t *dbuf_out
   This kernel will add data in frequency, detect and scale the added data;
   The detail for the add here is different from the normal sum as we need to put two polarisation togethere here;
  */
-__global__ void add_detect_scale_kernel(cufftComplex *dbuf_rt2, uint8_t *dbuf_out, size_t offset_rt2, float *ddat_offs, float *ddat_scl)
+__global__ void add_detect_scale_kernel(cufftComplex *dbuf_rt2, uint8_t *dbuf_out_search, size_t offset_rt2, float *ddat_offs, float *ddat_scl)
 {
   extern __shared__ cufftComplex sdata[];
   size_t tid, loc, loc_freq, s;
@@ -498,7 +498,7 @@ __global__ void add_detect_scale_kernel(cufftComplex *dbuf_rt2, uint8_t *dbuf_ou
     {
       loc_freq = blockIdx.y;
       flux = sqrtf(sdata[0].x * sdata[0].x + sdata[0].y * sdata[0].y); // Detect it;      
-      dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((flux - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);// scale it;
+      dbuf_out_search[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((flux - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);// scale it;
     }
 }
 

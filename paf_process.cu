@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
 	  break;
 	  
 	case 'b':	  
-	  if (sscanf (optarg, "%x", &conf.key_out) != 1)
+	  if (sscanf (optarg, "%x", &conf.key_out_fold) != 1)
 	    {
 	      //multilog (runtime_log, LOG_ERR, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);
 	      fprintf (stderr, "Could not parse key from %s, which happens at \"%s\", line [%d].\n", optarg, __FILE__, __LINE__);

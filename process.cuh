@@ -85,37 +85,40 @@ typedef struct conf_t
   int sod;
   int stream_ndf;
   int nstream;
-  float scl_ndim_fold;
+  float sclndim_fold, sclndim_search;
 
   int nrun_blk;
   char dir[MSTR_LEN];
   char utc_start[MSTR_LEN];
   uint64_t picoseconds;
   
-  key_t key_out, key_in;
-  dada_hdu_t *hdu_out, *hdu_in;
+  key_t key_out_fold, key_in, key_out_search;
+  dada_hdu_t *hdu_out_fold, *hdu_in, *hdu_out_search;
   
-  char *hdrbuf_in, *hdrbuf_out;
+  char *hdrbuf_in, *hdrbuf_out_fold, *hdrbuf_out_search;
   int64_t *dbuf_in;
-  int8_t *dbuf_out;
+  int8_t *dbuf_out_fold;
+  uint8_t *dbuf_out_search;
   //float *dbuf_out;
 
   double freq;
   
   double rbufin_ndf;
-  size_t bufin_size, bufout_size; // Device buffer size for all streams
-  size_t sbufin_size, sbufout_size; // Buffer size for each stream
+  size_t bufin_size, bufout_size_fold, bufout_size_search; // Device buffer size for all streams
+  size_t sbufin_size, sbufout_size_fold, sbufout_size_search; // Buffer size for each stream
   size_t bufrt1_size, bufrt2_size;
   size_t sbufrt1_size, sbufrt2_size;
   cufftComplex *buf_rt1, *buf_rt2;
   size_t hbufin_offset, dbufin_offset;
   size_t bufrt1_offset, bufrt2_offset;
-  size_t dbufout_offset, hbufout_offset;
+  size_t dbufout_offset_fold, hbufout_offset_fold; 
+  size_t dbufout_offset_search, hbufout_offset_search;
   size_t nsamp1, npol1, ndata1;
   size_t nsamp2, npol2, ndata2;
+  size_t nsamp3, npol3, ndata3; // For search part
   //size_t nbufin_rbuf;   // How many input GPU memory buffer can be fitted into the input ring buffer;
   
-  size_t hdrsz, rbufin_size, rbufout_size; // HDR size for both HDU and ring buffer size of input HDU;
+  size_t hdrsz, rbufin_size, rbufout_size_fold, rbufout_size_search; // HDR size for both HDU and ring buffer size of input HDU;
   // Input ring buffer size is different from the size of bufin, which is the size for GPU input memory;
   // Out ring buffer size is the same with the size of bufout, which is the size for GPU output memory;
   
