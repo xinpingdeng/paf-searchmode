@@ -75,11 +75,13 @@ int init_process(conf_t *conf)
       CufftSafeCall(cufftSetStream(conf->fft_plans2[i], conf->streams[i]));
     }
   
-  conf->sbufin_size       = conf->ndata1 * NBYTE_IN;
-  conf->sbufout_size_fold = conf->ndata2 * NBYTE_OUT;
+  conf->sbufin_size         = conf->ndata1 * NBYTE_IN;
+  conf->sbufout_size_fold   = conf->ndata2 * NBYTE_OUT_FOLD;
+  conf->sbufout_size_search = conf->ndata2 * NBYTE_OUT_SEARCH;
   
-  conf->bufin_size        = conf->nstream * conf->sbufin_size;
-  conf->bufout_size_fold  = conf->nstream * conf->sbufout_size_fold;
+  conf->bufin_size          = conf->nstream * conf->sbufin_size;
+  conf->bufout_size_fold    = conf->nstream * conf->sbufout_size_fold;
+  conf->bufout_size_search  = conf->nstream * conf->sbufout_size_search;
   
   conf->sbufrt1_size = conf->npol1 * NBYTE_RT;
   conf->sbufrt2_size = conf->npol2 * NBYTE_RT;
@@ -91,23 +93,36 @@ int init_process(conf_t *conf)
   conf->bufrt1_offset = conf->sbufrt1_size / sizeof(cufftComplex);
   conf->bufrt2_offset = conf->sbufrt2_size / sizeof(cufftComplex);
   
-  conf->dbufout_offset_fold = conf->sbufout_size_fold / sizeof(int8_t);
-  //conf->dbufout_offset_fold = conf->sbufout_size_fold / sizeof(float);
-  conf->hbufout_offset_fold = conf->sbufout_size_fold / sizeof(char);
-  	  
+  conf->dbufout_offset_fold   = conf->sbufout_size_fold / NBYTE_OUT_FOLD;
+  conf->hbufout_offset_fold   = conf->sbufout_size_fold / sizeof(char);
+  conf->dbufout_offset_search = conf->sbufout_size_search / NBYTE_OUT_SEARCH;
+  conf->hbufout_offset_search = conf->sbufout_size_search / sizeof(char);
+  
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_in, conf->bufin_size));   
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out_fold, conf->bufout_size_fold)); 
+  CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out_search, conf->bufout_size_search));
+  
+  CudaSafeCall(cudaMalloc((void **)&conf->ddat_offs_fold, NCHAN_FOLD * sizeof(float)));
+  CudaSafeCall(cudaMalloc((void **)&conf->dsquare_mean_fold, NCHAN_FOLD * sizeof(float)));
+  CudaSafeCall(cudaMalloc((void **)&conf->ddat_scl_fold, NCHAN_FOLD * sizeof(float)));
+  
+  CudaSafeCall(cudaMemset((void *)conf->ddat_offs_fold, 0, NCHAN_FOLD * sizeof(float)));   // We have to clear the memory for this parameter
+  CudaSafeCall(cudaMemset((void *)conf->dsquare_mean_fold, 0, NCHAN_FOLD * sizeof(float)));// We have to clear the memory for this parameter
+  
+  CudaSafeCall(cudaMallocHost((void **)&conf->hdat_scl_fold, NCHAN_FOLD * sizeof(float)));   // Malloc host memory to receive data from device
+  CudaSafeCall(cudaMallocHost((void **)&conf->hdat_offs_fold, NCHAN_FOLD * sizeof(float)));   // Malloc host memory to receive data from device
+  CudaSafeCall(cudaMallocHost((void **)&conf->hsquare_mean_fold, NCHAN_FOLD * sizeof(float)));   // Malloc host memory to receive data from device
 
-  CudaSafeCall(cudaMalloc((void **)&conf->ddat_offs, NCHAN_FOLD * sizeof(float)));
-  CudaSafeCall(cudaMalloc((void **)&conf->dsquare_mean, NCHAN_FOLD * sizeof(float)));
-  CudaSafeCall(cudaMalloc((void **)&conf->ddat_scl, NCHAN_FOLD * sizeof(float)));
+  CudaSafeCall(cudaMalloc((void **)&conf->ddat_offs_search, NCHAN_SEARCH * sizeof(float)));
+  CudaSafeCall(cudaMalloc((void **)&conf->dsquare_mean_search, NCHAN_SEARCH * sizeof(float)));
+  CudaSafeCall(cudaMalloc((void **)&conf->ddat_scl_search, NCHAN_SEARCH * sizeof(float)));
   
-  CudaSafeCall(cudaMemset((void *)conf->ddat_offs, 0, NCHAN_FOLD * sizeof(float)));   // We have to clear the memory for this parameter
-  CudaSafeCall(cudaMemset((void *)conf->dsquare_mean, 0, NCHAN_FOLD * sizeof(float)));// We have to clear the memory for this parameter
+  CudaSafeCall(cudaMemset((void *)conf->ddat_offs_search, 0, NCHAN_SEARCH * sizeof(float)));   // We have to clear the memory for this parameter
+  CudaSafeCall(cudaMemset((void *)conf->dsquare_mean_search, 0, NCHAN_SEARCH * sizeof(float)));// We have to clear the memory for this parameter
   
-  CudaSafeCall(cudaMallocHost((void **)&conf->hdat_scl, NCHAN_FOLD * sizeof(float)));   // Malloc device memory to receive data from host
-  CudaSafeCall(cudaMallocHost((void **)&conf->hdat_offs, NCHAN_FOLD * sizeof(float)));   // Malloc device memory to receive data from host
-  CudaSafeCall(cudaMallocHost((void **)&conf->hsquare_mean, NCHAN_FOLD * sizeof(float)));   // Malloc device memory to receive data from host
+  CudaSafeCall(cudaMallocHost((void **)&conf->hdat_scl_search, NCHAN_SEARCH * sizeof(float)));   // Malloc host memory to receive data from device
+  CudaSafeCall(cudaMallocHost((void **)&conf->hdat_offs_search, NCHAN_SEARCH * sizeof(float)));   // Malloc host memory to receive data from device
+  CudaSafeCall(cudaMallocHost((void **)&conf->hsquare_mean_search, NCHAN_SEARCH * sizeof(float)));   // Malloc host memory to receive data from device
 
   CudaSafeCall(cudaMalloc((void **)&conf->buf_rt1, conf->bufrt1_size));
   CudaSafeCall(cudaMalloc((void **)&conf->buf_rt2, conf->bufrt2_size)); 
@@ -393,7 +408,7 @@ int do_process(conf_t conf)
   dat_offs_scl(conf);
 #ifdef DEBUG
   for(i = 0; i < NCHAN_FOLD; i++)
-    fprintf(stdout, "DAT_OFFS:\t%E\tDAT_SCL:\t%E\n", conf.hdat_offs[i], conf.hdat_scl[i]);
+    fprintf(stdout, "DAT_OFFS:\t%E\tDAT_SCL:\t%E\n", conf.hdat_offs_fold[i], conf.hdat_scl_fold[i]);
 #endif
   
   /* Do the real job */
@@ -465,7 +480,7 @@ int do_process(conf_t conf)
 	      
 	      /* Get final output */
 	      //transpose_scale_kernel3<<<gridsize_transpose_scale3, blocksize_transpose_scale3, 0, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out_fold[dbufout_offset_fold], conf.nsamp2, conf.scale);  
-	      transpose_scale_kernel4<<<gridsize_transpose_scale4, blocksize_transpose_scale4, 0, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out_fold[dbufout_offset_fold], conf.nsamp2, conf.ddat_offs, conf.ddat_scl);   
+	      transpose_scale_kernel4<<<gridsize_transpose_scale4, blocksize_transpose_scale4, 0, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out_fold[dbufout_offset_fold], conf.nsamp2, conf.ddat_offs_fold, conf.ddat_scl_fold);   
 	      //transpose_float_kernel<<<gridsize_transpose_float, blocksize_transpose_float, 0, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out_fold[dbufout_offset_fold], conf.nsamp2);   
 	      
 	      /* Copy the final output to host */
@@ -642,11 +657,11 @@ int dat_offs_scl(conf_t conf)
 	}
       CudaSynchronizeCall(); // Sync here is for multiple streams
 
-      mean_kernel<<<gridsize_mean_fold, blocksize_mean_fold>>>(conf.buf_rt1, conf.bufrt1_offset, conf.ddat_offs, conf.dsquare_mean, conf.nstream, conf.sclndim_fold);
+      mean_kernel<<<gridsize_mean_fold, blocksize_mean_fold>>>(conf.buf_rt1, conf.bufrt1_offset, conf.ddat_offs_fold, conf.dsquare_mean_fold, conf.nstream, conf.sclndim_fold);
     }
   
   /* Get the scale of each chanel */
-  scale_kernel<<<gridsize_scale_fold, blocksize_scale_fold>>>(conf.ddat_offs, conf.dsquare_mean, conf.ddat_scl);
+  scale_kernel<<<gridsize_scale_fold, blocksize_scale_fold>>>(conf.ddat_offs_fold, conf.dsquare_mean_fold, conf.ddat_scl_fold);
   CudaSynchronizeCall();
   
 #ifdef DEBUG
@@ -656,9 +671,9 @@ int dat_offs_scl(conf_t conf)
   fprintf(stdout, "elapsed time to get scale with %.0f data is %f s\n", conf.sclndim_fold, elapsed_event/1.0E3);
 #endif
   
-  CudaSafeCall(cudaMemcpy(conf.hdat_offs, conf.ddat_offs, sizeof(float) * NCHAN_FOLD, cudaMemcpyDeviceToHost));
-  CudaSafeCall(cudaMemcpy(conf.hdat_scl, conf.ddat_scl, sizeof(float) * NCHAN_FOLD, cudaMemcpyDeviceToHost));
-  CudaSafeCall(cudaMemcpy(conf.hsquare_mean, conf.dsquare_mean, sizeof(float) * NCHAN_FOLD, cudaMemcpyDeviceToHost));
+  CudaSafeCall(cudaMemcpy(conf.hdat_offs_fold, conf.ddat_offs_fold, sizeof(float) * NCHAN_FOLD, cudaMemcpyDeviceToHost));
+  CudaSafeCall(cudaMemcpy(conf.hdat_scl_fold, conf.ddat_scl_fold, sizeof(float) * NCHAN_FOLD, cudaMemcpyDeviceToHost));
+  CudaSafeCall(cudaMemcpy(conf.hsquare_mean_fold, conf.dsquare_mean_fold, sizeof(float) * NCHAN_FOLD, cudaMemcpyDeviceToHost));
   
 #ifdef DEBUG
   for (i = 0; i< NCHAN_FOLD; i++)
@@ -675,7 +690,7 @@ int dat_offs_scl(conf_t conf)
     }
   
   for (i = 0; i< NCHAN_FOLD; i++)
-    fprintf(fp, "%E\t%E\n", conf.hdat_offs[i], conf.hdat_scl[i]);
+    fprintf(fp, "%E\t%E\n", conf.hdat_offs_fold[i], conf.hdat_scl_fold[i]);
   
   fclose(fp);
   return EXIT_SUCCESS;
@@ -695,14 +710,21 @@ int destroy_process(conf_t conf)
   
   cudaFree(conf.dbuf_in);
   cudaFree(conf.dbuf_out_fold);
+  cudaFree(conf.dbuf_out_search);
 
-  cudaFreeHost(conf.hdat_offs);
-  cudaFreeHost(conf.hsquare_mean);
-  cudaFreeHost(conf.hdat_scl);
+  cudaFreeHost(conf.hdat_offs_fold);
+  cudaFreeHost(conf.hsquare_mean_fold);
+  cudaFreeHost(conf.hdat_scl_fold);
+  cudaFree(conf.ddat_offs_fold);
+  cudaFree(conf.dsquare_mean_fold);
+  cudaFree(conf.ddat_scl_fold);
 
-  cudaFree(conf.ddat_offs);
-  cudaFree(conf.dsquare_mean);
-  cudaFree(conf.ddat_scl);
+  cudaFreeHost(conf.hdat_offs_search);
+  cudaFreeHost(conf.hsquare_mean_search);
+  cudaFreeHost(conf.hdat_scl_search);
+  cudaFree(conf.ddat_offs_search);
+  cudaFree(conf.dsquare_mean_search);
+  cudaFree(conf.ddat_scl_search);
   
   cudaFree(conf.buf_rt1);
   cudaFree(conf.buf_rt2);

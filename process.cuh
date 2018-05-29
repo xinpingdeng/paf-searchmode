@@ -26,8 +26,9 @@
 
 #define NBYTE_RT              8    // cudaComplex
 #define NBYTE_IN              2    // int16_t
-#define NBYTE_OUT             1    // int8_t
-//#define NBYTE_OUT             4    // float
+#define NBYTE_OUT_FOLD        1    // int8_t
+#define NBYTE_OUT_SEARCH      1    // uint8_t
+//#define NBYTE_OUT_FOLD      4    // float
 
 #define OSAMP_RATEI           0.84375
 #define CUFFT_RANK1           1
@@ -122,8 +123,10 @@ typedef struct conf_t
   // Input ring buffer size is different from the size of bufin, which is the size for GPU input memory;
   // Out ring buffer size is the same with the size of bufout, which is the size for GPU output memory;
   
-  float *ddat_offs, *dsquare_mean, *ddat_scl;
-  float *hdat_offs, *hsquare_mean, *hdat_scl;
+  float *ddat_offs_fold, *dsquare_mean_fold, *ddat_scl_fold;
+  float *hdat_offs_fold, *hsquare_mean_fold, *hdat_scl_fold;
+  float *ddat_offs_search, *dsquare_mean_search, *ddat_scl_search;
+  float *hdat_offs_search, *hsquare_mean_search, *hdat_scl_search;
   cudaStream_t *streams;
   cufftHandle *fft_plans1, *fft_plans2;
   
