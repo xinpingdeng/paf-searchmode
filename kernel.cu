@@ -102,7 +102,7 @@ __global__ void swap_kernel(cufftComplex *dbuf_rt, cufftComplex *dbuf_rt2, size_
 }
 
 /* 
-   This is a combination of swap_select_kernel and swap_kernel, it is is used to :
+   This is a combination of swap_select_transpose_kernel and swap_kernel, it is is used to :
    1. swap the halves of CUDA FFT output, we need to do that because CUDA FFT put the centre frequency at bin 0;
    2. drop the first three and last two points of the swapped 32-points FFT output, which will reduce to oversample rate to 1;
    3. drop the edge of passband to give a good number for reverse FFT;
@@ -146,7 +146,7 @@ __global__ void swap_select_transpose_swap_kernel(cufftComplex *dbuf_rt1, cufftC
 }
 
 /* 
-   This kernel will make the scale calculation easier:
+   This kernel will make the scale calculation of fold mode easier:
    1. reorder the second FFT data from PTFT order to FTP;
    2. pad the dbuf_rt1.x with the sum of dbuf_rt2.x + dbuf_rt2.y (after transpose);
    3. pad the dbuf_rt1.y with the sum of dbuf_rt2.x ** 2 + dbuf_rt2.y ** 2 (after transpose);
@@ -205,13 +205,13 @@ __global__ void sum_kernel(cufftComplex *dbuf_rt1, cufftComplex *dbuf_rt2)
       __syncthreads();
     }
 
-  /* write result for this block to global mem */
+  /* write result of this block to global mem */
   if (tid == 0)
     dbuf_rt2[blockIdx.x * gridDim.y + blockIdx.y] = sdata[0];
 }
 
 /*
-  This kernel calculate the mean of (samples and square of samples, which are padded in buf_rt1). 
+  This kernel calculate the mean of (samples and square of samples, which are padded in buf_rt1 for fold mode, or buf_rt2 for search mode). 
  */
 __global__ void mean_kernel(cufftComplex *buf_rt1, size_t offset_rt1, float *ddat_offs, float *dsquare_mean, int nstream, float scl_ndim)
 {
@@ -271,16 +271,16 @@ __global__ void transpose_scale_kernel(cufftComplex *dbuf_rt2, int8_t *dbuf_out,
 //*/
 //__global__ void transpose_scale_kernel2(cufftComplex *dbuf_rt2, int8_t *dbuf_out, size_t offset_rt2, int scale)
 //{
-//  __shared__ int8_t tile[NPOL_SAMP * NDIM_POL][NCHAN_FINAL][CUFFT_NX2]; // Here we have bank conflict problem, need more time to fix it.
+//  __shared__ int8_t tile[NPOL_SAMP * NDIM_POL][NCHAN_FOLD][CUFFT_NX2]; // Here we have bank conflict problem, need more time to fix it.
 //
 //  int i, x, y;
 //  size_t loc, loc_rt2, loc_out;
 //  cufftComplex p1, p2;
 //
 //  x = threadIdx.x;
-//  loc = blockIdx.x * blockDim.x * blockDim.y * NCHAN_FINAL / CUFFT_NX2;
+//  loc = blockIdx.x * blockDim.x * blockDim.y * NCHAN_FOLD / CUFFT_NX2;
 //  
-//  for (i = 0; i < NCHAN_FINAL; i += CUFFT_NX2)
+//  for (i = 0; i < NCHAN_FOLD; i += CUFFT_NX2)
 //    {
 //      y = threadIdx.y + i;
 //      
@@ -298,11 +298,11 @@ __global__ void transpose_scale_kernel(cufftComplex *dbuf_rt2, int8_t *dbuf_out,
 //
 //  __syncthreads(); // sync all threads in the same block;
 //
-//  for (i = 0; i < NCHAN_FINAL; i += CUFFT_NX2)
+//  for (i = 0; i < NCHAN_FOLD; i += CUFFT_NX2)
 //    {
 //      y = threadIdx.y + i;
 //
-//      loc_out = (loc + x * NCHAN_FINAL  + y) * NPOL_SAMP * NDIM_POL;
+//      loc_out = (loc + x * NCHAN_FOLD  + y) * NPOL_SAMP * NDIM_POL;
 //      dbuf_out[loc_out]     = tile[0][y][x];
 //      dbuf_out[loc_out + 1] = tile[1][y][x];
 //      dbuf_out[loc_out + 2] = tile[2][y][x];
@@ -461,3 +461,87 @@ __global__ void transpose_scale_kernel4(cufftComplex *dbuf_rt2, int8_t *dbuf_out
 //      dbuf_out[loc_out + 3] = tile[3][x][y];
 //    }
 //}
+
+
+/*
+  This kernel will add data in frequency, detect and scale the added data;
+  The detail for the add here is different from the normal sum as we need to put two polarisation togethere here;
+ */
+__global__ void add_detect_scale_kernel(cufftComplex *dbuf_rt2, uint8_t *dbuf_out, size_t offset_rt2, float *ddat_offs, float *ddat_scl)
+{
+  extern __shared__ cufftComplex sdata[];
+  size_t tid, loc, loc_freq, s;
+  float flux;
+  
+  tid = threadIdx.x;
+  loc = blockIdx.x * gridDim.y * (blockDim.x * 2) +
+    blockIdx.y * (blockDim.x * 2) +
+    threadIdx.x;
+  /* Put two polarisation into shared memory at the same time */
+  sdata[tid].x = dbuf_rt2[loc].x + dbuf_rt2[loc + blockDim.x].x + dbuf_rt2[offset_rt2 + loc].x + dbuf_rt2[offset_rt2 + loc + blockDim.x].x; 
+  sdata[tid].y = dbuf_rt2[loc].y + dbuf_rt2[loc + blockDim.x].y + dbuf_rt2[offset_rt2 + loc].y + dbuf_rt2[offset_rt2 + loc + blockDim.x].y;
+  __syncthreads();
+
+  /* do reduction in shared mem */
+  for (s=blockDim.x/2; s>0; s>>=1)
+    {
+      if (tid < s)
+  	{
+  	  sdata[tid].x += sdata[tid + s].x;
+  	  sdata[tid].y += sdata[tid + s].y;
+  	}
+      __syncthreads();
+    }
+  
+  /* write result of this block to global mem */
+  if (tid == 0)
+    {
+      loc_freq = blockIdx.y;
+      flux = sqrtf(sdata[0].x * sdata[0].x + sdata[0].y * sdata[0].y); // Detect it;      
+      dbuf_out[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((flux - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);// scale it;
+    }
+}
+
+/*
+   This kernel will make the scale calculation of search mode easier, the input is PTF data and the output is padded data
+   1. add data in frequency and get the channels into NCHAN_SEARCH;
+   2. detect the added data;
+   3. pad the dbuf_rt1.x with flux;
+   4. pad the dbuf_rt1.y with the power of flux;
+   5. the importtant here is that the order of padded data is in FT;
+ */
+__global__ void add_detect_pad_kernel(cufftComplex *dbuf_rt2, cufftComplex *dbuf_rt1, size_t offset_rt2)
+{
+  extern __shared__ cufftComplex sdata[];
+  size_t tid, loc, s;
+  float flux, flux2;
+  
+  tid = threadIdx.x;
+  loc = blockIdx.x * gridDim.y * (blockDim.x * 2) +
+    blockIdx.y * (blockDim.x * 2) +
+    threadIdx.x;
+  /* Put two polarisation into shared memory at the same time */
+  sdata[tid].x = dbuf_rt2[loc].x + dbuf_rt2[loc + blockDim.x].x + dbuf_rt2[offset_rt2 + loc].x + dbuf_rt2[offset_rt2 + loc + blockDim.x].x; 
+  sdata[tid].y = dbuf_rt2[loc].y + dbuf_rt2[loc + blockDim.x].y + dbuf_rt2[offset_rt2 + loc].y + dbuf_rt2[offset_rt2 + loc + blockDim.x].y;
+  __syncthreads();
+
+  /* do reduction in shared mem */
+  for (s=blockDim.x/2; s>0; s>>=1)
+    {
+      if (tid < s)
+  	{
+  	  sdata[tid].x += sdata[tid + s].x;
+  	  sdata[tid].y += sdata[tid + s].y;
+  	}
+      __syncthreads();
+    }
+  
+  /* write result of this block to global mem */
+  if (tid == 0)
+    {
+      flux2 = sdata[0].x * sdata[0].x + sdata[0].y * sdata[0].y;
+      flux  = sqrtf(flux2);
+      dbuf_rt1[blockIdx.y * gridDim.x + blockIdx.x].x = flux;
+      dbuf_rt1[blockIdx.y * gridDim.x + blockIdx.x].y = flux2;
+    }
+}

@@ -26,7 +26,7 @@ int init_process(conf_t *conf)
   ipcbuf_t *db = NULL;
   
   /* Prepare buffer, stream and fft plan for process */
-  conf->scl_ndim    = conf->rbufin_ndf * NSAMP_DF * NPOL_SAMP * NDIM_POL;
+  conf->scl_ndim_fold    = conf->rbufin_ndf * NSAMP_DF * NPOL_SAMP * NDIM_POL;
   conf->nsamp1      = conf->stream_ndf * NCHK_NIC * NCHAN_CHK * NSAMP_DF;
   conf->npol1       = conf->nsamp1 * NPOL_SAMP;
   conf->ndata1      = conf->npol1  * NDIM_POL;
@@ -93,16 +93,16 @@ int init_process(conf_t *conf)
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_in, conf->bufin_size));   
   CudaSafeCall(cudaMalloc((void **)&conf->dbuf_out, conf->bufout_size)); 
 
-  CudaSafeCall(cudaMalloc((void **)&conf->ddat_offs, NCHAN_FINAL * sizeof(float)));
-  CudaSafeCall(cudaMalloc((void **)&conf->dsquare_mean, NCHAN_FINAL * sizeof(float)));
-  CudaSafeCall(cudaMalloc((void **)&conf->ddat_scl, NCHAN_FINAL * sizeof(float)));
+  CudaSafeCall(cudaMalloc((void **)&conf->ddat_offs, NCHAN_FOLD * sizeof(float)));
+  CudaSafeCall(cudaMalloc((void **)&conf->dsquare_mean, NCHAN_FOLD * sizeof(float)));
+  CudaSafeCall(cudaMalloc((void **)&conf->ddat_scl, NCHAN_FOLD * sizeof(float)));
   
-  CudaSafeCall(cudaMemset((void *)conf->ddat_offs, 0, NCHAN_FINAL * sizeof(float)));   // We have to clear the memory for this parameter
-  CudaSafeCall(cudaMemset((void *)conf->dsquare_mean, 0, NCHAN_FINAL * sizeof(float)));// We have to clear the memory for this parameter
+  CudaSafeCall(cudaMemset((void *)conf->ddat_offs, 0, NCHAN_FOLD * sizeof(float)));   // We have to clear the memory for this parameter
+  CudaSafeCall(cudaMemset((void *)conf->dsquare_mean, 0, NCHAN_FOLD * sizeof(float)));// We have to clear the memory for this parameter
   
-  CudaSafeCall(cudaMallocHost((void **)&conf->hdat_scl, NCHAN_FINAL * sizeof(float)));   // Malloc device memory to receive data from host
-  CudaSafeCall(cudaMallocHost((void **)&conf->hdat_offs, NCHAN_FINAL * sizeof(float)));   // Malloc device memory to receive data from host
-  CudaSafeCall(cudaMallocHost((void **)&conf->hsquare_mean, NCHAN_FINAL * sizeof(float)));   // Malloc device memory to receive data from host
+  CudaSafeCall(cudaMallocHost((void **)&conf->hdat_scl, NCHAN_FOLD * sizeof(float)));   // Malloc device memory to receive data from host
+  CudaSafeCall(cudaMallocHost((void **)&conf->hdat_offs, NCHAN_FOLD * sizeof(float)));   // Malloc device memory to receive data from host
+  CudaSafeCall(cudaMallocHost((void **)&conf->hsquare_mean, NCHAN_FOLD * sizeof(float)));   // Malloc device memory to receive data from host
 
   CudaSafeCall(cudaMalloc((void **)&conf->buf_rt1, conf->bufrt1_size));
   CudaSafeCall(cudaMalloc((void **)&conf->buf_rt2, conf->bufrt2_size)); 
@@ -130,53 +130,53 @@ int init_process(conf_t *conf)
   conf->blocksize_swap_select_transpose_swap.z = 1;
       
   conf->gridsize_swap.x = conf->stream_ndf * NSAMP_DF / CUFFT_NX1; 
-  conf->gridsize_swap.y = NCHAN_FINAL;
+  conf->gridsize_swap.y = NCHAN_FOLD;
   conf->gridsize_swap.z = 1;
   conf->blocksize_swap.x = CUFFT_NX2;
   conf->blocksize_swap.y = 1;
   conf->blocksize_swap.z = 1;
   
-  conf->gridsize_mean.x = 1; 
-  conf->gridsize_mean.y = 1; 
-  conf->gridsize_mean.z = 1;
-  conf->blocksize_mean.x = NCHAN_FINAL; 
-  conf->blocksize_mean.y = 1;
-  conf->blocksize_mean.z = 1;
+  conf->gridsize_mean_fold.x = 1; 
+  conf->gridsize_mean_fold.y = 1; 
+  conf->gridsize_mean_fold.z = 1;
+  conf->blocksize_mean_fold.x = NCHAN_FOLD; 
+  conf->blocksize_mean_fold.y = 1;
+  conf->blocksize_mean_fold.z = 1;
   
-  conf->gridsize_scale.x = 1;
-  conf->gridsize_scale.y = 1;
-  conf->gridsize_scale.z = 1;
-  conf->blocksize_scale.x = NCHAN_FINAL;
-  conf->blocksize_scale.y = 1;
-  conf->blocksize_scale.z = 1;
+  conf->gridsize_scale_fold.x = 1;
+  conf->gridsize_scale_fold.y = 1;
+  conf->gridsize_scale_fold.z = 1;
+  conf->blocksize_scale_fold.x = NCHAN_FOLD;
+  conf->blocksize_scale_fold.y = 1;
+  conf->blocksize_scale_fold.z = 1;
   
   conf->gridsize_transpose_scale.x = conf->stream_ndf * NSAMP_DF / CUFFT_NX1; 
-  conf->gridsize_transpose_scale.y = NCHAN_FINAL;
+  conf->gridsize_transpose_scale.y = NCHAN_FOLD;
   conf->gridsize_transpose_scale.z = 1;
   conf->blocksize_transpose_scale.x = CUFFT_NX2;
   conf->blocksize_transpose_scale.y = 1;
   conf->blocksize_transpose_scale.z = 1;
   
   conf->gridsize_transpose_pad.x = conf->stream_ndf * NSAMP_DF / CUFFT_NX1; 
-  conf->gridsize_transpose_pad.y = NCHAN_FINAL;
+  conf->gridsize_transpose_pad.y = NCHAN_FOLD;
   conf->gridsize_transpose_pad.z = 1;
   conf->blocksize_transpose_pad.x = CUFFT_NX2;
   conf->blocksize_transpose_pad.y = 1;
   conf->blocksize_transpose_pad.z = 1;
 
-  conf->gridsize_sum1.x = NCHAN_FINAL;
-  conf->gridsize_sum1.y = conf->stream_ndf * NPOL_SAMP;
-  conf->gridsize_sum1.z = 1;
-  conf->blocksize_sum1.x = NSAMP_DF / 2;
-  conf->blocksize_sum1.y = 1;
-  conf->blocksize_sum1.z = 1;
+  conf->gridsize_sum1_fold.x = NCHAN_FOLD;
+  conf->gridsize_sum1_fold.y = conf->stream_ndf * NPOL_SAMP;
+  conf->gridsize_sum1_fold.z = 1;
+  conf->blocksize_sum1_fold.x = NSAMP_DF / 2;
+  conf->blocksize_sum1_fold.y = 1;
+  conf->blocksize_sum1_fold.z = 1;
   
-  conf->gridsize_sum2.x = NCHAN_FINAL;
-  conf->gridsize_sum2.y = 1;
-  conf->gridsize_sum2.z = 1;
-  conf->blocksize_sum2.x = conf->stream_ndf * NPOL_SAMP / 2;
-  conf->blocksize_sum2.y = 1;
-  conf->blocksize_sum2.z = 1;
+  conf->gridsize_sum2_fold.x = NCHAN_FOLD;
+  conf->gridsize_sum2_fold.y = 1;
+  conf->gridsize_sum2_fold.z = 1;
+  conf->blocksize_sum2_fold.x = conf->stream_ndf * NPOL_SAMP / 2;
+  conf->blocksize_sum2_fold.y = 1;
+  conf->blocksize_sum2_fold.z = 1;
   
   conf->gridsize_transpose_scale2.x = conf->stream_ndf * NSAMP_DF / CUFFT_NX1; 
   conf->gridsize_transpose_scale2.y = 1;
@@ -186,25 +186,61 @@ int init_process(conf_t *conf)
   conf->blocksize_transpose_scale2.z = 1;
   
   conf->gridsize_transpose_scale3.x = conf->stream_ndf * NSAMP_DF / CUFFT_NX1; 
-  conf->gridsize_transpose_scale3.y = NCHAN_FINAL / TILE_DIM;
+  conf->gridsize_transpose_scale3.y = NCHAN_FOLD / TILE_DIM;
   conf->gridsize_transpose_scale3.z = 1;
   conf->blocksize_transpose_scale3.x = TILE_DIM;
   conf->blocksize_transpose_scale3.y = NROWBLOCK_TRANS;
   conf->blocksize_transpose_scale3.z = 1;
   
   conf->gridsize_transpose_scale4.x = conf->stream_ndf * NSAMP_DF / CUFFT_NX1; 
-  conf->gridsize_transpose_scale4.y = NCHAN_FINAL / TILE_DIM;
+  conf->gridsize_transpose_scale4.y = NCHAN_FOLD / TILE_DIM;
   conf->gridsize_transpose_scale4.z = 1;
   conf->blocksize_transpose_scale4.x = TILE_DIM;
   conf->blocksize_transpose_scale4.y = NROWBLOCK_TRANS;
   conf->blocksize_transpose_scale4.z = 1;
   
   conf->gridsize_transpose_float.x = conf->stream_ndf * NSAMP_DF / CUFFT_NX1; 
-  conf->gridsize_transpose_float.y = NCHAN_FINAL / TILE_DIM;
+  conf->gridsize_transpose_float.y = NCHAN_FOLD / TILE_DIM;
   conf->gridsize_transpose_float.z = 1;
   conf->blocksize_transpose_float.x = TILE_DIM;
   conf->blocksize_transpose_float.y = NROWBLOCK_TRANS;
   conf->blocksize_transpose_float.z = 1;
+
+  /* Only for search mode */
+  conf->gridsize_add_detect_scale.x = conf->stream_ndf * NSAMP_DF / CUFFT_NX1;
+  conf->gridsize_add_detect_scale.y = NCHAN_SEARCH;
+  conf->gridsize_add_detect_scale.z = 1;
+  conf->blocksize_add_detect_scale.x = NCHAN_KEEP2/(2 * NCHAN_SEARCH);
+  conf->blocksize_add_detect_scale.y = 1;
+  conf->blocksize_add_detect_scale.z = 1;
+  
+  conf->gridsize_add_detect_pad.x = conf->stream_ndf * NSAMP_DF / CUFFT_NX1;
+  conf->gridsize_add_detect_pad.y = NCHAN_SEARCH;
+  conf->gridsize_add_detect_pad.z = 1;
+  conf->blocksize_add_detect_pad.x = NCHAN_KEEP2/(2 * NCHAN_SEARCH);
+  conf->blocksize_add_detect_pad.y = 1;
+  conf->blocksize_add_detect_pad.z = 1;
+  
+  conf->gridsize_sum_search.x = NCHAN_SEARCH;
+  conf->gridsize_sum_search.y = 1;
+  conf->gridsize_sum_search.z = 1;
+  conf->blocksize_sum_search.x = conf->stream_ndf * NSAMP_DF / (CUFFT_NX1 * 2); 
+  conf->blocksize_sum_search.y = 1;
+  conf->blocksize_sum_search.z = 1;
+  
+  conf->gridsize_mean_search.x = 1; 
+  conf->gridsize_mean_search.y = 1; 
+  conf->gridsize_mean_search.z = 1;
+  conf->blocksize_mean_search.x = NCHAN_SEARCH;
+  conf->blocksize_mean_search.y = 1;
+  conf->blocksize_mean_search.z = 1;
+  
+  conf->gridsize_scale_search.x = 1;
+  conf->gridsize_scale_search.y = 1;
+  conf->gridsize_scale_search.z = 1;
+  conf->blocksize_scale_search.x = NCHAN_SEARCH;
+  conf->blocksize_scale_search.y = 1;
+  conf->blocksize_scale_search.z = 1;
   
   /* attach to input ring buffer */
   conf->hdu_in = dada_hdu_create(runtime_log);
@@ -311,13 +347,18 @@ int do_process(conf_t conf)
   CudaSafeCall(cudaSetDevice(conf.device_id));
   
   /*
-    The whole procedure is :
+    The whole procedure for fold mode is :
+    1. Unpack the data and reorder it from TFTFP to PFT order, prepare for the forward FFT;
+    2. Forward FFT the PFT data to get finer channelzation and the data is in PFTF order after FFT;
+    3. Swap the FFT output to put the frequency centre on the right place, drop frequency channel edge and band edge and put the data into PTF order, swap the data and put the centre frequency at bin 0 for each FFT block, prepare for inverse FFT;
+    4. Inverse FFT the data to get PTFT order data;
+    5. Transpose the data to get TFP data and scale it;    
+
+    The whole procedure for search mode is :
     1. Unpack the data and reorder it from TFTFP to PFT order, prepare for the forward FFT;
     2. Forward FFT the PFT data to get finer channelzation and the data is in PFTF order after FFT;
     3. Swap the FFT output to put the frequency centre on the right place, drop frequency channel edge and band edge and put the data into PTF order;
-    4. Swap the previous data PTF data and put the centre frequency at bin 0 for each FFT block, prepare for inverse FFT;
-    5. Inverse FFT the data to get PTFT order data;
-    6. Swap the data to get TFP data and scale it;
+    4. Add the data in frequency to get NCHAN_SEARCH channels, detect the added data and scale it;
   */
   size_t i, j;
   size_t hbufin_offset, dbufin_offset, bufrt1_offset, bufrt2_offset, hbufout_offset, dbufout_offset;
@@ -326,24 +367,27 @@ int do_process(conf_t conf)
   dim3 gridsize_transpose_scale3, blocksize_transpose_scale3;
   dim3 gridsize_transpose_scale4, blocksize_transpose_scale4;
   dim3 gridsize_transpose_float, blocksize_transpose_float;
+  dim3 gridsize_add_detect_scale, blocksize_add_detect_scale;
   uint64_t block_id = 0;
   size_t curbufsz;
   
-  gridsize_unpack            = conf.gridsize_unpack;
-  blocksize_unpack           = conf.blocksize_unpack;
+  gridsize_unpack                      = conf.gridsize_unpack;
+  blocksize_unpack                     = conf.blocksize_unpack;
   gridsize_swap_select_transpose_swap  = conf.gridsize_swap_select_transpose_swap;   
   blocksize_swap_select_transpose_swap = conf.blocksize_swap_select_transpose_swap;  
-  gridsize_transpose_scale3       = conf.gridsize_transpose_scale3;
-  blocksize_transpose_scale3      = conf.blocksize_transpose_scale3; 
-  gridsize_transpose_scale4       = conf.gridsize_transpose_scale4;
-  blocksize_transpose_scale4      = conf.blocksize_transpose_scale4;
-  gridsize_transpose_float        = conf.gridsize_transpose_float;
-  blocksize_transpose_float       = conf.blocksize_transpose_float;
-    
+  gridsize_transpose_scale3            = conf.gridsize_transpose_scale3;
+  blocksize_transpose_scale3           = conf.blocksize_transpose_scale3; 
+  gridsize_transpose_scale4            = conf.gridsize_transpose_scale4;
+  blocksize_transpose_scale4           = conf.blocksize_transpose_scale4;
+  gridsize_transpose_float             = conf.gridsize_transpose_float;
+  blocksize_transpose_float            = conf.blocksize_transpose_float;
+  gridsize_add_detect_scale            = conf.gridsize_add_detect_scale ;
+  blocksize_add_detect_scale           = conf.blocksize_add_detect_scale ;
+  
   /* Get scale of data */
   dat_offs_scl(conf);
 #ifdef DEBUG
-  for(i = 0; i < NCHAN_FINAL; i++)
+  for(i = 0; i < NCHAN_FOLD; i++)
     fprintf(stdout, "DAT_OFFS:\t%E\tDAT_SCL:\t%E\n", conf.hdat_offs[i], conf.hdat_scl[i]);
 #endif
   
@@ -407,8 +451,8 @@ int do_process(conf_t conf)
 	      
 	      /* Prepare for inverse FFT */
 	      swap_select_transpose_swap_kernel<<<gridsize_swap_select_transpose_swap, blocksize_swap_select_transpose_swap, 0, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], conf.nsamp1, conf.nsamp2); // This kernle is the combination of previous kernels	  
-	      // For search mode, here we need one moere kernel, which average the data in frequency and scale it, the name of this kernel will be average_detect_scale_kernel;
-	      // The key thing to remember is that after average, we do not have that much data and the size of grid and block need to be updated;
+	      // For search mode, here we need one moere kernel, which add the data in frequency and scale it, the name of this kernel will be add_detect_scale_kernel;
+	      // The key thing to remember is that after add, we do not have that much data and the size of grid and block need to be updated;
 	      // The kernel for fold mode after this line and inverse FFT are not needed for search mode;
 
 	      /* Do inverse FFT */
@@ -475,17 +519,39 @@ int do_process(conf_t conf)
 int dat_offs_scl(conf_t conf)
 {
   CudaSafeCall(cudaSetDevice(conf.device_id));
-  
+
+  /*
+    The procedure for fold mode is:
+    1. Get PTFT data as we did at process;
+    2. Pad the data;
+    3. Add the padded data in time;
+    4. Get the mean of the added data;
+    5. Get the scale with the mean;
+
+    The procedure for search mode is:
+    1. Get PTF data as we did at process;
+    2. Add the data in frequency to get NCHAN_SEARCH channels, detect the added data and pad it;
+    3. Add the padded data in time;    
+    4. Get the mean of the added data;
+    5. Get the scale with the mean;
+  */
   size_t i, j;
   dim3 gridsize_unpack, blocksize_unpack;
   dim3 gridsize_swap_select_transpose_swap, blocksize_swap_select_transpose_swap;
-  dim3 gridsize_scale, blocksize_scale;  
-  dim3 gridsize_mean, blocksize_mean;
-  dim3 gridsize_sum1, blocksize_sum1;
-  dim3 gridsize_sum2, blocksize_sum2;
+  dim3 gridsize_scale_fold, blocksize_scale_fold;  
+  dim3 gridsize_mean_fold, blocksize_mean_fold;
+  dim3 gridsize_sum1_fold, blocksize_sum1_fold;
+  dim3 gridsize_sum2_fold, blocksize_sum2_fold;
   dim3 gridsize_transpose_pad, blocksize_transpose_pad;
   size_t hbufin_offset, dbufin_offset, bufrt1_offset, bufrt2_offset;
   size_t curbufsz, block_id;
+
+  dim3 gridsize_swap_select_transpose, blocksize_swap_select_transpose;
+  dim3 gridsize_scale_search, blocksize_scale_search;  
+  dim3 gridsize_mean_search, blocksize_mean_search;
+  dim3 gridsize_sum_search, blocksize_sum_search;
+  dim3 gridsize_add_detect_pad, blocksize_add_detect_pad;
+  
   char fname[MSTR_LEN];
   FILE *fp=NULL;
     
@@ -496,15 +562,26 @@ int dat_offs_scl(conf_t conf)
   gridsize_transpose_pad               = conf.gridsize_transpose_pad;
   blocksize_transpose_pad              = conf.blocksize_transpose_pad;
   	         	               						       
-  gridsize_sum1                        = conf.gridsize_sum1;	       
-  blocksize_sum1                       = conf.blocksize_sum1;
-  gridsize_sum2                        = conf.gridsize_sum2;	       
-  blocksize_sum2                       = conf.blocksize_sum2;
-  gridsize_scale                       = conf.gridsize_scale;	       
-  blocksize_scale                      = conf.blocksize_scale;	         							       
-  gridsize_mean                        = conf.gridsize_mean;	       
-  blocksize_mean                       = conf.blocksize_mean;
+  gridsize_sum1_fold              = conf.gridsize_sum1_fold;	       
+  blocksize_sum1_fold             = conf.blocksize_sum1_fold;
+  gridsize_sum2_fold              = conf.gridsize_sum2_fold;	       
+  blocksize_sum2_fold             = conf.blocksize_sum2_fold;
+  gridsize_scale_fold             = conf.gridsize_scale_fold;	       
+  blocksize_scale_fold            = conf.blocksize_scale_fold;	         					    
+  gridsize_mean_fold              = conf.gridsize_mean_fold;	       
+  blocksize_mean_fold             = conf.blocksize_mean_fold;
 
+  gridsize_sum_search             = conf.gridsize_sum_search;	       
+  blocksize_sum_search            = conf.blocksize_sum_search;
+  gridsize_scale_search           = conf.gridsize_scale_search;	       
+  blocksize_scale_search          = conf.blocksize_scale_search;	         		           
+  gridsize_mean_search            = conf.gridsize_mean_search;	       
+  blocksize_mean_search           = conf.blocksize_mean_search;
+  gridsize_swap_select_transpose  = conf.gridsize_swap_select_transpose;   
+  blocksize_swap_select_transpose = conf.blocksize_swap_select_transpose;
+  gridsize_add_detect_pad         = conf.gridsize_add_detect_pad ;
+  blocksize_add_detect_pad        = conf.blocksize_add_detect_pad ;
+  
   conf.hdu_in->data_block->curbuf = ipcio_open_block_read(conf.hdu_in->data_block, &curbufsz, &block_id);
   if(conf.hdu_in->data_block->curbuf == NULL)
     {
@@ -542,8 +619,8 @@ int dat_offs_scl(conf_t conf)
 	  /* Prepare for inverse FFT */
 	  swap_select_transpose_swap_kernel<<<gridsize_swap_select_transpose_swap, blocksize_swap_select_transpose_swap, 0, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], conf.nsamp1, conf.nsamp2); 
 
-	  // For search mode, we need to get a kernel to average data in frequency and pad data as I do with fold mode;
-	  // The key thing to remember is that after average, we do not have that much data and the size of grid and block need to be updated;
+	  // For search mode, we need to get a kernel to add data in frequency and pad data as I do with fold mode, the name of the kernel is add_detect_pad_kernel;
+	  // The key thing to remember is that after add, we do not have that much data and the size of grid and block need to be updated;
 	  // The sum kernel may need to be re-designed, at least the size of grid and block need to be updated;
 	  
 	  /* Do inverse FFT */
@@ -553,33 +630,33 @@ int dat_offs_scl(conf_t conf)
 	  transpose_pad_kernel<<<gridsize_transpose_pad, blocksize_transpose_pad, 0, conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], conf.nsamp2, &conf.buf_rt1[bufrt1_offset]);
 
 	  /* Get the sum of samples and square of samples */
-	  sum_kernel<<<gridsize_sum1, blocksize_sum1, blocksize_sum1.x * sizeof(cufftComplex), conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset]);
-	  sum_kernel<<<gridsize_sum2, blocksize_sum2, blocksize_sum2.x * sizeof(cufftComplex), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset]);
+	  sum_kernel<<<gridsize_sum1_fold, blocksize_sum1_fold, blocksize_sum1_fold.x * sizeof(cufftComplex), conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset]);
+	  sum_kernel<<<gridsize_sum2_fold, blocksize_sum2_fold, blocksize_sum2_fold.x * sizeof(cufftComplex), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset]);
 
 	  //CudaSafeCall(cudaStreamSynchronize(conf.streams[j])); // Sync here equal to single stream
 	}
       CudaSynchronizeCall(); // Sync here is for multiple streams
 
-      mean_kernel<<<gridsize_mean, blocksize_mean>>>(conf.buf_rt1, conf.bufrt1_offset, conf.ddat_offs, conf.dsquare_mean, conf.nstream, conf.scl_ndim);
+      mean_kernel<<<gridsize_mean_fold, blocksize_mean_fold>>>(conf.buf_rt1, conf.bufrt1_offset, conf.ddat_offs, conf.dsquare_mean, conf.nstream, conf.scl_ndim_fold);
     }
   
   /* Get the scale of each chanel */
-  scale_kernel<<<gridsize_scale, blocksize_scale>>>(conf.ddat_offs, conf.dsquare_mean, conf.ddat_scl);
+  scale_kernel<<<gridsize_scale_fold, blocksize_scale_fold>>>(conf.ddat_offs, conf.dsquare_mean, conf.ddat_scl);
   CudaSynchronizeCall();
   
 #ifdef DEBUG
   CudaSafeCall(cudaEventRecord(stop_event));
   CudaSafeCall(cudaEventSynchronize(stop_event));
   CudaSafeCall(cudaEventElapsedTime(&elapsed_event, start_event, stop_event));
-  fprintf(stdout, "elapsed time to get scale with %.0f data is %f s\n", conf.scl_ndim, elapsed_event/1.0E3);
+  fprintf(stdout, "elapsed time to get scale with %.0f data is %f s\n", conf.scl_ndim_fold, elapsed_event/1.0E3);
 #endif
   
-  CudaSafeCall(cudaMemcpy(conf.hdat_offs, conf.ddat_offs, sizeof(float) * NCHAN_FINAL, cudaMemcpyDeviceToHost));
-  CudaSafeCall(cudaMemcpy(conf.hdat_scl, conf.ddat_scl, sizeof(float) * NCHAN_FINAL, cudaMemcpyDeviceToHost));
-  CudaSafeCall(cudaMemcpy(conf.hsquare_mean, conf.dsquare_mean, sizeof(float) * NCHAN_FINAL, cudaMemcpyDeviceToHost));
+  CudaSafeCall(cudaMemcpy(conf.hdat_offs, conf.ddat_offs, sizeof(float) * NCHAN_FOLD, cudaMemcpyDeviceToHost));
+  CudaSafeCall(cudaMemcpy(conf.hdat_scl, conf.ddat_scl, sizeof(float) * NCHAN_FOLD, cudaMemcpyDeviceToHost));
+  CudaSafeCall(cudaMemcpy(conf.hsquare_mean, conf.dsquare_mean, sizeof(float) * NCHAN_FOLD, cudaMemcpyDeviceToHost));
   
 #ifdef DEBUG
-  for (i = 0; i< NCHAN_FINAL; i++)
+  for (i = 0; i< NCHAN_FOLD; i++)
     fprintf(stdout, "DAT_OFFS:\t%E\tDAT_SCL:\t%E\n", conf.hdat_offs[i], conf.hdat_scl[i]);
 #endif
   /* Record scale into file */
@@ -592,7 +669,7 @@ int dat_offs_scl(conf_t conf)
       return EXIT_FAILURE;
     }
   
-  for (i = 0; i< NCHAN_FINAL; i++)
+  for (i = 0; i< NCHAN_FOLD; i++)
     fprintf(fp, "%E\t%E\n", conf.hdat_offs[i], conf.hdat_scl[i]);
   
   fclose(fp);
