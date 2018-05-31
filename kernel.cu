@@ -501,8 +501,8 @@ __global__ void add_detect_scale_kernel(cufftComplex *dbuf_rt2, uint8_t *dbuf_ou
   if (tid == 0)
     {
       loc_freq = blockIdx.y;
-      //flux = sqrtf(sdata[0].x * sdata[0].x + sdata[0].y * sdata[0].y); // Detect it;      
-      //dbuf_out_search[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((flux - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);// scale it;
+      flux = sqrtf(sdata[0].x * sdata[0].x + sdata[0].y * sdata[0].y); // Detect it;      
+      dbuf_out_search[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((flux - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);// scale it;
     }
 }
 

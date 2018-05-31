@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# ./fold_file.py -a fold_file.conf -b /beegfs/DENG/docker/ -c J0332+5434 -d 0 -e 0 -f 2018-04-17-19:22:11.56868_0000000000000000.000000.dada
+# ./process_fil_dump.py -a fold_file.conf -b /beegfs/DENG/docker/ -c J0332+5434 -d 0 -e 0 -f 2018-04-17-19:22:11.56868_0000000000000000.000000.dada
 # tempo2 -f mypar.par -pred "sitename mjd1 mjd2 freq1 freq2 ntimecoeff nfreqcoeff seg_length"
 
 import os, time, threading, ConfigParser, argparse, socket, json, struct, sys
@@ -102,14 +102,13 @@ process_ndf        = int(ConfigSectionMap("ProcessConf")['stream_ndfstp'])
 process_nstream    = int(ConfigSectionMap("ProcessConf")['nstream'])
 process_osampratei = float(ConfigSectionMap("ProcessConf")['osamp_ratei'])
 process_nchanratei = float(ConfigSectionMap("ProcessConf")['nchan_ratei'])
-process_rbufsz     = int(0.5 * diskdb_rbufsz * process_osampratei / process_nchanratei)
+process_rbufsz     = int(0.5 * diskdb_rbufsz * process_osampratei / process_nchanratei / 64.0)
 
 process_hfname     = ConfigSectionMap("ProcessConf")['hfname']
 process_cpu        = 1 
 
-# Fold configuration
-fold_cpu = 2
-subint   = int(ConfigSectionMap("FoldConf")['subint'])
+# Dbdisk configuration
+dbdisk_cpu = 2
 
 # Check the buffer block can be covered with multiple run of multiple streams
 if (diskdb_ndf % (process_nstream * process_ndf)):
@@ -125,15 +124,11 @@ def process():
     if memcheck:
         os.system('taskset -c {:d} cuda-memcheck ./paf_process -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:d} -g {:s} -i {:d} -j {:s} -k {:s} -l {:d}'.format(process_cpu, diskdb_key, process_key, diskdb_ndf, nrun_blk, process_nstream, process_ndf, process_sod, gpu, process_hfname, directory, stream))
     else:
-        os.system('taskset -c {:d} ./paf_process -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:d} -g {:s} -i {:d} -j {:s} -k {:s} -l {:d}'.format(process_cpu, diskdb_key, process_key, diskdb_ndf, nrun_blk, process_nstream, process_ndf, process_sod, gpu, process_hfname, directory, stream))     
+        os.system('taskset -c {:d} ./paf_process -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:d} -g {:s} -i {:d} -j {:s} -k {:s} -l {:d}'.format(process_cpu, diskdb_key, process_key, diskdb_ndf, nrun_blk, process_nstream, process_ndf, process_sod, gpu, process_hfname, directory, stream))
 
-def fold():
-    # If we only have one visible GPU, we will have to set it to 0;
-    if (multi_gpu):
-        os.system('dspsr -cpu {:d} -E {:s}.par {:s} -cuda {:d},{:d} -L {:d} -A'.format(fold_cpu, psrname, process_kfname, gpu, gpu, subint))
-    else:
-        print ('dspsr -cpu {:d} -E {:s}.par {:s} -cuda 0,0 -L {:d} -A'.format(fold_cpu, psrname, process_kfname, subint))
-        os.system('dspsr -cpu {:d} -E {:s}.par {:s} -cuda 0,0 -L {:d} -A'.format(fold_cpu, psrname, process_kfname, subint))
+def dbdisk():
+    os.system('dada_dbdisk -b {:d} -k {:s} -D {:s} -W'.format(dbdisk_cpu, process_key, directory))
+
          
 def main():
     # Create key files
@@ -157,15 +152,15 @@ def main():
         
     t_diskdb  = threading.Thread(target = diskdb)
     t_process = threading.Thread(target = process)
-    t_fold    = threading.Thread(target = fold)
+    t_dbdisk    = threading.Thread(target = dbdisk)
     
     t_diskdb.start()
     t_process.start()
-    t_fold.start()
+    t_dbdisk.start()
     
     t_diskdb.join()
     t_process.join()
-    t_fold.join()
+    t_dbdisk.join()
 
     os.system("dada_db -d -k {:s}".format(diskdb_key))
     os.system("dada_db -d -k {:s}".format(process_key))

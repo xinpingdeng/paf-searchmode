@@ -51,6 +51,8 @@ parser.add_argument('-e', '--visiblegpu', type=str, nargs='+',
                     help='Visible GPU, the parameter is for the usage inside docker container.')
 parser.add_argument('-f', '--dfname', type=str, nargs='+',
                     help='The name of data file.')
+parser.add_argument('-g', '--memcheck', type=int, nargs='+',
+                    help='To run cuda-memcheck or not.')
 
 args         = parser.parse_args()
 cfname       = args.cfname[0]
@@ -58,6 +60,7 @@ gpu          = args.gpu[0]
 directory    = args.directory[0]
 psrname      = args.psrname[0]
 dfname       = args.dfname[0]
+memcheck     = args.memcheck[0]
 
 if(args.visiblegpu[0]==''):
     multi_gpu = 1;
@@ -119,15 +122,20 @@ def diskdb():
     os.system('taskset -c {:d} ./paf_diskdb -a {:s} -b {:s} -c {:s} -d {:s} -e {:s}'.format(diskdb_cpu, diskdb_key, directory, dfname, diskdb_hfname, diskdb_sod))
 
 def process():
-    os.system('taskset -c {:d} ./paf_process -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:d} -g {:s} -i {:d} -j {:s} -k {:s} -l {:d}'.format(process_cpu, diskdb_key, process_key, diskdb_ndf, nrun_blk, process_nstream, process_ndf, process_sod, gpu, process_hfname, directory, stream))
+    if memcheck:
+        os.system('taskset -c {:d} cuda-memcheck ./paf_process -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:d} -g {:s} -i {:d} -j {:s} -k {:s} -l {:d}'.format(process_cpu, diskdb_key, process_key, diskdb_ndf, nrun_blk, process_nstream, process_ndf, process_sod, gpu, process_hfname, directory, stream))
+    else:
+        os.system('taskset -c {:d} ./paf_process -a {:s} -b {:s} -c {:d} -d {:d} -e {:d} -f {:d} -g {:s} -i {:d} -j {:s} -k {:s} -l {:d}'.format(process_cpu, diskdb_key, process_key, diskdb_ndf, nrun_blk, process_nstream, process_ndf, process_sod, gpu, process_hfname, directory, stream))
 
 def fold():
     # If we only have one visible GPU, we will have to set it to 0;
     if (multi_gpu):
-        os.system('dspsr -cpu {:d} -E {:s}.par {:s} -cuda {:d},{:d} -L {:d} -A'.format(fold_cpu, psrname, process_kfname, gpu, gpu, subint))
+        #os.system('dspsr -cpu {:d} -E {:s}.par {:s} -cuda {:d},{:d} -L {:d} -A'.format(fold_cpu, psrname, process_kfname, gpu, gpu, subint))
+        os.system('dspsr -cpu {:d} -E {:s}.par {:s}  -L {:d} -A'.format(fold_cpu, psrname, process_kfname, subint))
     else:
         print ('dspsr -cpu {:d} -E {:s}.par {:s} -cuda 0,0 -L {:d} -A'.format(fold_cpu, psrname, process_kfname, subint))
-        os.system('dspsr -cpu {:d} -E {:s}.par {:s} -cuda 0,0 -L {:d} -A'.format(fold_cpu, psrname, process_kfname, subint))
+        #os.system('dspsr -cpu {:d} -E {:s}.par {:s} -cuda 0,0 -L {:d} -A'.format(fold_cpu, psrname, process_kfname, subint))
+        os.system('dspsr -cpu {:d} -E {:s}.par {:s} -L {:d} -A'.format(fold_cpu, psrname, process_kfname, subint))
          
 def main():
     # Create key files

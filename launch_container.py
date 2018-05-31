@@ -3,7 +3,7 @@
 import os
 
 length  = 20
-numa    = 0
+numa    = 1
 memsize = 80000000000
 hdir    = '/home/pulsar/'
 ddir    = '/beegfs/DENG/docker'
