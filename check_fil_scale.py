@@ -10,23 +10,24 @@ import numpy.fft as fft
 
 repeat     = 1
 nsamp      = 1
-nchan      = 256
-npol       = 2
-ndim       = 2
+nchan      = 1024
+npol       = 1
+ndim       = 1
 ndata      = nsamp * nchan * npol * ndim
 hdrsize    = 4096
 dsize = 1
-fdir  = "/beegfs/DENG/"
-fname = '2016-04-14-13:27:30_0000003584000000.x.dada'
-#fname = '2018-03-29-12:37:55.212043_0000032768000000.000000.dada'
+fdir  = "/beegfs/DENG/docker"
+fname = '2018-04-17-19:22:11_0000000000000000.000000.dada'
 
 blksize  = ndata * dsize
 fname = os.path.join(fdir, fname)
 f = open(fname, "r")
 f.seek(hdrsize + repeat * blksize)
-sample = np.array(np.fromstring(f.read(blksize), dtype='int8'))
+sample = np.array(np.fromstring(f.read(blksize), dtype='uint8'))
 #sample = np.reshape(sample, (nsamp, nchan, npol * ndim))
 
 plt.figure()
 plt.plot(sample)
 plt.show()
+
+f.close()

@@ -473,17 +473,28 @@ __global__ void transpose_scale_kernel4(cufftComplex *dbuf_rt2, int8_t *dbuf_out
  */
 __global__ void add_detect_scale_kernel(cufftComplex *dbuf_rt2, uint8_t *dbuf_out_search, size_t offset_rt2, float *ddat_offs, float *ddat_scl)
 {
-  extern __shared__ cufftComplex sdata[];
-  size_t tid, loc, loc_freq, s;
+  extern __shared__ cufftComplex sdata1[], sdata2[];
+  size_t tid, loc1, loc2, loc11, loc22, loc_freq, s;
   float flux;
   
   tid = threadIdx.x;
-  loc = blockIdx.x * gridDim.y * (blockDim.x * 2) +
+
+  loc1 = blockIdx.x * gridDim.y * (blockDim.x * 2) +
     blockIdx.y * (blockDim.x * 2) +
     threadIdx.x;
+  loc11 = loc1 + blockDim.x;
+
+  loc2 = loc1 + offset_rt2;
+  loc22 = loc2 + blockDim.x;
+  
   /* Put two polarisation into shared memory at the same time */
-  sdata[tid].x = dbuf_rt2[loc].x + dbuf_rt2[loc + blockDim.x].x + dbuf_rt2[offset_rt2 + loc].x + dbuf_rt2[offset_rt2 + loc + blockDim.x].x; 
-  sdata[tid].y = dbuf_rt2[loc].y + dbuf_rt2[loc + blockDim.x].y + dbuf_rt2[offset_rt2 + loc].y + dbuf_rt2[offset_rt2 + loc + blockDim.x].y;
+  sdata1[tid].x = dbuf_rt2[loc1].x + dbuf_rt2[loc11].x;
+  sdata1[tid].y = dbuf_rt2[loc1].y + dbuf_rt2[loc11].y;
+  sdata2[tid].x = dbuf_rt2[loc2].x + dbuf_rt2[loc22].x; 
+  sdata2[tid].y = dbuf_rt2[loc2].y + dbuf_rt2[loc22].y;
+
+  //sdata1[tid].x = dbuf_rt2[loc1].x * dbuf_rt2[loc1].x + dbuf_rt2[loc11].x * dbuf_rt2[loc11].x + dbuf_rt2[loc1].y * dbuf_rt2[loc1].y + dbuf_rt2[loc11].y * dbuf_rt2[loc11].y;
+  //sdata2[tid].x = dbuf_rt2[loc2].x * dbuf_rt2[loc2].x + dbuf_rt2[loc22].x * dbuf_rt2[loc22].x + dbuf_rt2[loc2].y * dbuf_rt2[loc2].y + dbuf_rt2[loc22].y * dbuf_rt2[loc22].y;
   __syncthreads();
 
   /* do reduction in shared mem */
@@ -491,8 +502,10 @@ __global__ void add_detect_scale_kernel(cufftComplex *dbuf_rt2, uint8_t *dbuf_ou
     {
       if (tid < s)
   	{
-  	  sdata[tid].x += sdata[tid + s].x;
-  	  sdata[tid].y += sdata[tid + s].y;
+  	  sdata1[tid].x += sdata1[tid + s].x;
+  	  sdata1[tid].y += sdata1[tid + s].y;
+  	  sdata2[tid].x += sdata2[tid + s].x;
+  	  sdata2[tid].y += sdata2[tid + s].y;
   	}
       __syncthreads();
     }
@@ -501,7 +514,10 @@ __global__ void add_detect_scale_kernel(cufftComplex *dbuf_rt2, uint8_t *dbuf_ou
   if (tid == 0)
     {
       loc_freq = blockIdx.y;
-      flux = sqrtf(sdata[0].x * sdata[0].x + sdata[0].y * sdata[0].y); // Detect it;      
+      //flux = sqrtf(sdata1[0].x * sdata1[0].x + sdata1[0].y * sdata1[0].y + sdata2[0].x * sdata2[0].x + sdata2[0].y * sdata2[0].y); 
+      //flux = sqrtf(sdata1[0].x + sdata2[0].x);
+      //flux = sdata1[0].x + sdata2[0].x;
+      flux = sdata1[0].x * sdata1[0].x + sdata1[0].y * sdata1[0].y + sdata2[0].x * sdata2[0].x + sdata2[0].y * sdata2[0].y; 
       dbuf_out_search[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((flux - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);// scale it;
     }
 }
@@ -516,17 +532,26 @@ __global__ void add_detect_scale_kernel(cufftComplex *dbuf_rt2, uint8_t *dbuf_ou
  */
 __global__ void add_detect_pad_kernel(cufftComplex *dbuf_rt2, cufftComplex *dbuf_rt1, size_t offset_rt2)
 {
-  extern __shared__ cufftComplex sdata[];
-  size_t tid, loc, s;
+  extern __shared__ cufftComplex sdata1[], sdata2[];
+  size_t tid, loc1, loc11, loc2, loc22, s;
   float flux, flux2;
   
   tid = threadIdx.x;
-  loc = blockIdx.x * gridDim.y * (blockDim.x * 2) +
+  loc1 = blockIdx.x * gridDim.y * (blockDim.x * 2) +
     blockIdx.y * (blockDim.x * 2) +
     threadIdx.x;
+  loc11 = loc1 + blockDim.x;
+  loc2 = loc1 + offset_rt2;
+  loc22 = loc2 + blockDim.x;
+  
   /* Put two polarisation into shared memory at the same time */
-  sdata[tid].x = dbuf_rt2[loc].x + dbuf_rt2[loc + blockDim.x].x + dbuf_rt2[offset_rt2 + loc].x + dbuf_rt2[offset_rt2 + loc + blockDim.x].x; 
-  sdata[tid].y = dbuf_rt2[loc].y + dbuf_rt2[loc + blockDim.x].y + dbuf_rt2[offset_rt2 + loc].y + dbuf_rt2[offset_rt2 + loc + blockDim.x].y;
+  sdata1[tid].x = dbuf_rt2[loc1].x + dbuf_rt2[loc11].x;
+  sdata1[tid].y = dbuf_rt2[loc1].y + dbuf_rt2[loc11].y;
+  sdata2[tid].x = dbuf_rt2[loc2].x + dbuf_rt2[loc22].x; 
+  sdata2[tid].y = dbuf_rt2[loc2].y + dbuf_rt2[loc22].y;
+
+  //sdata1[tid].x = dbuf_rt2[loc1].x * dbuf_rt2[loc1].x + dbuf_rt2[loc11].x * dbuf_rt2[loc11].x + dbuf_rt2[loc1].y * dbuf_rt2[loc1].y + dbuf_rt2[loc11].y * dbuf_rt2[loc11].y;
+  //sdata2[tid].x = dbuf_rt2[loc2].x * dbuf_rt2[loc2].x + dbuf_rt2[loc22].x * dbuf_rt2[loc22].x + dbuf_rt2[loc2].y * dbuf_rt2[loc2].y + dbuf_rt2[loc22].y * dbuf_rt2[loc22].y;
   __syncthreads();
 
   /* do reduction in shared mem */
@@ -534,8 +559,10 @@ __global__ void add_detect_pad_kernel(cufftComplex *dbuf_rt2, cufftComplex *dbuf
     {
       if (tid < s)
   	{
-  	  sdata[tid].x += sdata[tid + s].x;
-  	  sdata[tid].y += sdata[tid + s].y;
+  	  sdata1[tid].x += sdata1[tid + s].x;
+  	  sdata1[tid].y += sdata1[tid + s].y;
+  	  sdata2[tid].x += sdata2[tid + s].x;
+  	  sdata2[tid].y += sdata2[tid + s].y;
   	}
       __syncthreads();
     }
@@ -543,8 +570,15 @@ __global__ void add_detect_pad_kernel(cufftComplex *dbuf_rt2, cufftComplex *dbuf
   /* write result of this block to global mem */
   if (tid == 0)
     {
-      flux2 = sdata[0].x * sdata[0].x + sdata[0].y * sdata[0].y;
-      flux  = sqrtf(flux2);
+      //flux2 = sdata1[0].x * sdata1[0].x + sdata1[0].y * sdata1[0].y +sdata2[0].x * sdata2[0].x + sdata2[0].y * sdata2[0].y;
+      //flux2 = sdata1[0].x + sdata2[0].x;
+      //flux  = sqrtf(flux2);
+
+      //flux = sdata1[0].x + sdata2[0].x;
+      //flux2 = flux * flux;
+
+      flux = sdata1[0].x * sdata1[0].x + sdata1[0].y * sdata1[0].y +sdata2[0].x * sdata2[0].x + sdata2[0].y * sdata2[0].y;
+      flux2 = flux * flux;
       dbuf_rt1[blockIdx.y * gridDim.x + blockIdx.x].x = flux;
       dbuf_rt1[blockIdx.y * gridDim.x + blockIdx.x].y = flux2;
     }
