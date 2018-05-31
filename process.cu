@@ -548,8 +548,7 @@ int do_process(conf_t conf)
 	      else
 		{
 		  swap_select_transpose_kernel<<<gridsize_swap_select_transpose, blocksize_swap_select_transpose, 0, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], conf.nsamp1, conf.nsamp2); 		  
-		  //add_detect_scale_kernel<<<gridsize_add_detect_scale, blocksize_add_detect_scale, blocksize_add_detect_scale.x * sizeof(cufftComplex), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out_search[dbufout_offset_search], conf.nsamp2, conf.ddat_offs_search, conf.ddat_scl_search);
-		  add_detect_scale_kernel<<<gridsize_add_detect_scale, blocksize_add_detect_scale, 2 * blocksize_add_detect_scale.x * sizeof(cufftComplex), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out_search[dbufout_offset_search], conf.nsamp2, conf.ddat_offs_search, conf.ddat_scl_search);
+		  add_detect_scale_kernel<<<gridsize_add_detect_scale, blocksize_add_detect_scale, blocksize_add_detect_scale.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.dbuf_out_search[dbufout_offset_search], conf.nsamp2, conf.ddat_offs_search, conf.ddat_scl_search);
 		  CudaSafeCall(cudaMemcpyAsync(&conf.hdu_out_search->data_block->curbuf[hbufout_offset_search], &conf.dbuf_out_search[dbufout_offset_search], conf.sbufout_size_search, cudaMemcpyDeviceToHost, conf.streams[j]));
 		}
 	      //fprintf(stdout, "STREAM HERE 2\n");
@@ -743,8 +742,7 @@ int dat_offs_scl(conf_t conf)
 	  else
 	    {
 	      swap_select_transpose_kernel<<<gridsize_swap_select_transpose, blocksize_swap_select_transpose, 0, conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset], conf.nsamp1, conf.nsamp2); 		  
-	      //add_detect_pad_kernel<<<gridsize_add_detect_pad, blocksize_add_detect_pad, blocksize_add_detect_pad.x * sizeof(cufftComplex), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2);
-	      add_detect_pad_kernel<<<gridsize_add_detect_pad, blocksize_add_detect_pad, 2 * blocksize_add_detect_pad.x * sizeof(cufftComplex), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2);
+	      add_detect_pad_kernel<<<gridsize_add_detect_pad, blocksize_add_detect_pad, blocksize_add_detect_pad.x * sizeof(float), conf.streams[j]>>>(&conf.buf_rt2[bufrt2_offset], &conf.buf_rt1[bufrt1_offset], conf.nsamp2);
 	      sum_kernel<<<gridsize_sum_search, blocksize_sum_search, blocksize_sum_search.x * sizeof(cufftComplex), conf.streams[j]>>>(&conf.buf_rt1[bufrt1_offset], &conf.buf_rt2[bufrt2_offset]);
 	    }
 	}

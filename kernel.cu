@@ -185,15 +185,15 @@ __global__ void transpose_pad_kernel(cufftComplex *dbuf_rt2, size_t offset_rt2, 
  */
 __global__ void sum_kernel(cufftComplex *dbuf_rt1, cufftComplex *dbuf_rt2)
 {
-  extern __shared__ cufftComplex sdata[];
+  extern __shared__ cufftComplex sum_sdata[];
   size_t tid, loc, s;
   
   tid = threadIdx.x;
   loc = blockIdx.x * gridDim.y * (blockDim.x * 2) +
     blockIdx.y * (blockDim.x * 2) +
     threadIdx.x;
-  sdata[tid].x = dbuf_rt1[loc].x + dbuf_rt1[loc + blockDim.x].x; 
-  sdata[tid].y = dbuf_rt1[loc].y + dbuf_rt1[loc + blockDim.x].y;
+  sum_sdata[tid].x = dbuf_rt1[loc].x + dbuf_rt1[loc + blockDim.x].x; 
+  sum_sdata[tid].y = dbuf_rt1[loc].y + dbuf_rt1[loc + blockDim.x].y;
   __syncthreads();
 
   /* do reduction in shared mem */
@@ -201,15 +201,15 @@ __global__ void sum_kernel(cufftComplex *dbuf_rt1, cufftComplex *dbuf_rt2)
     {
       if (tid < s)
   	{
-  	  sdata[tid].x += sdata[tid + s].x;
-  	  sdata[tid].y += sdata[tid + s].y;
+  	  sum_sdata[tid].x += sum_sdata[tid + s].x;
+  	  sum_sdata[tid].y += sum_sdata[tid + s].y;
   	}
       __syncthreads();
     }
 
   /* write result of this block to global mem */
   if (tid == 0)
-    dbuf_rt2[blockIdx.x * gridDim.y + blockIdx.y] = sdata[0];
+    dbuf_rt2[blockIdx.x * gridDim.y + blockIdx.y] = sum_sdata[0];
 }
 
 /*
@@ -473,7 +473,7 @@ __global__ void transpose_scale_kernel4(cufftComplex *dbuf_rt2, int8_t *dbuf_out
  */
 __global__ void add_detect_scale_kernel(cufftComplex *dbuf_rt2, uint8_t *dbuf_out_search, size_t offset_rt2, float *ddat_offs, float *ddat_scl)
 {
-  extern __shared__ cufftComplex sdata1[], sdata2[];
+  extern __shared__ float scale_sdata[];
   size_t tid, loc1, loc2, loc11, loc22, loc_freq, s;
   float power;
   
@@ -488,25 +488,23 @@ __global__ void add_detect_scale_kernel(cufftComplex *dbuf_rt2, uint8_t *dbuf_ou
   loc22 = loc2 + blockDim.x;
   
   /* Put two polarisation into shared memory at the same time */
-  //sdata1[tid].x = dbuf_rt2[loc1].x + dbuf_rt2[loc11].x;
-  //sdata1[tid].y = dbuf_rt2[loc1].y + dbuf_rt2[loc11].y;
-  //sdata2[tid].x = dbuf_rt2[loc2].x + dbuf_rt2[loc22].x; 
-  //sdata2[tid].y = dbuf_rt2[loc2].y + dbuf_rt2[loc22].y;
+  scale_sdata[tid] =
+    dbuf_rt2[loc1].x * dbuf_rt2[loc1].x +
+    dbuf_rt2[loc11].x * dbuf_rt2[loc11].x +
+    dbuf_rt2[loc1].y * dbuf_rt2[loc1].y +
+    dbuf_rt2[loc11].y * dbuf_rt2[loc11].y +
+    dbuf_rt2[loc2].x * dbuf_rt2[loc2].x +
+    dbuf_rt2[loc22].x * dbuf_rt2[loc22].x +
+    dbuf_rt2[loc2].y * dbuf_rt2[loc2].y +
+    dbuf_rt2[loc22].y * dbuf_rt2[loc22].y;
 
-  sdata1[tid].x = dbuf_rt2[loc1].x * dbuf_rt2[loc1].x + dbuf_rt2[loc11].x * dbuf_rt2[loc11].x + dbuf_rt2[loc1].y * dbuf_rt2[loc1].y + dbuf_rt2[loc11].y * dbuf_rt2[loc11].y;
-  sdata2[tid].x = dbuf_rt2[loc2].x * dbuf_rt2[loc2].x + dbuf_rt2[loc22].x * dbuf_rt2[loc22].x + dbuf_rt2[loc2].y * dbuf_rt2[loc2].y + dbuf_rt2[loc22].y * dbuf_rt2[loc22].y;
   __syncthreads();
 
   /* do reduction in shared mem */
   for (s=blockDim.x/2; s>0; s>>=1)
     {
       if (tid < s)
-  	{
-  	  sdata1[tid].x += sdata1[tid + s].x;
-  	  //sdata1[tid].y += sdata1[tid + s].y;
-  	  sdata2[tid].x += sdata2[tid + s].x;
-  	  //sdata2[tid].y += sdata2[tid + s].y;
-  	}
+	scale_sdata[tid] += scale_sdata[tid + s];
       __syncthreads();
     }
   
@@ -514,13 +512,8 @@ __global__ void add_detect_scale_kernel(cufftComplex *dbuf_rt2, uint8_t *dbuf_ou
   if (tid == 0)
     {
       loc_freq = blockIdx.y;
-      //power = sqrtf(sdata1[0].x * sdata1[0].x + sdata1[0].y * sdata1[0].y + sdata2[0].x * sdata2[0].x + sdata2[0].y * sdata2[0].y); 
-      //power = sqrtf(sdata1[0].x + sdata2[0].x);
-      //power = sdata1[0].x + sdata2[0].x;
-      power = (sdata1[0].x + sdata2[0].x)/(CUFFT_NX1 * NCHAN_KEEP2 / NCHAN_SEARCH)/(CUFFT_NX1 * NCHAN_KEEP2 / NCHAN_SEARCH);
-      //power = (sdata1[0].x + sdata2[0].x)/(CUFFT_NX1 * CUFFT_NX1);
-      
-      //power = sdata1[0].x * sdata1[0].x + sdata1[0].y * sdata1[0].y + sdata2[0].x * sdata2[0].x + sdata2[0].y * sdata2[0].y; 
+      power = scale_sdata[0]/(NPOL_SAMP * NDIM_POL * CUFFT_NX1 * NCHAN_KEEP2 / NCHAN_SEARCH)/(NPOL_SAMP * NDIM_POL * CUFFT_NX1 * NCHAN_KEEP2 / NCHAN_SEARCH);
+
       dbuf_out_search[blockIdx.x * gridDim.y + blockIdx.y] = __float2uint_rz((power - ddat_offs[loc_freq]) / ddat_scl[loc_freq]);// scale it;
     }
 }
@@ -535,7 +528,7 @@ __global__ void add_detect_scale_kernel(cufftComplex *dbuf_rt2, uint8_t *dbuf_ou
  */
 __global__ void add_detect_pad_kernel(cufftComplex *dbuf_rt2, cufftComplex *dbuf_rt1, size_t offset_rt2)
 {
-  extern __shared__ cufftComplex sdata1[], sdata2[];
+  extern __shared__ float pad_sdata[];
   size_t tid, loc1, loc11, loc2, loc22, s;
   float power, power2;
   
@@ -548,41 +541,31 @@ __global__ void add_detect_pad_kernel(cufftComplex *dbuf_rt2, cufftComplex *dbuf
   loc22 = loc2 + blockDim.x;
   
   /* Put two polarisation into shared memory at the same time */
-  //sdata1[tid].x = dbuf_rt2[loc1].x + dbuf_rt2[loc11].x;
-  //sdata1[tid].y = dbuf_rt2[loc1].y + dbuf_rt2[loc11].y;
-  //sdata2[tid].x = dbuf_rt2[loc2].x + dbuf_rt2[loc22].x; 
-  //sdata2[tid].y = dbuf_rt2[loc2].y + dbuf_rt2[loc22].y;
-
-  sdata1[tid].x = dbuf_rt2[loc1].x * dbuf_rt2[loc1].x + dbuf_rt2[loc11].x * dbuf_rt2[loc11].x + dbuf_rt2[loc1].y * dbuf_rt2[loc1].y + dbuf_rt2[loc11].y * dbuf_rt2[loc11].y;
-  sdata2[tid].x = dbuf_rt2[loc2].x * dbuf_rt2[loc2].x + dbuf_rt2[loc22].x * dbuf_rt2[loc22].x + dbuf_rt2[loc2].y * dbuf_rt2[loc2].y + dbuf_rt2[loc22].y * dbuf_rt2[loc22].y;
+  pad_sdata[tid] =
+    dbuf_rt2[loc1].x * dbuf_rt2[loc1].x +
+    dbuf_rt2[loc11].x * dbuf_rt2[loc11].x +
+    dbuf_rt2[loc1].y * dbuf_rt2[loc1].y +
+    dbuf_rt2[loc11].y * dbuf_rt2[loc11].y +
+    dbuf_rt2[loc2].x * dbuf_rt2[loc2].x +
+    dbuf_rt2[loc22].x * dbuf_rt2[loc22].x +
+    dbuf_rt2[loc2].y * dbuf_rt2[loc2].y +
+    dbuf_rt2[loc22].y * dbuf_rt2[loc22].y;
   __syncthreads();
 
   /* do reduction in shared mem */
   for (s=blockDim.x/2; s>0; s>>=1)
     {
       if (tid < s)
-  	{
-  	  sdata1[tid].x += sdata1[tid + s].x;
-  	  //sdata1[tid].y += sdata1[tid + s].y;
-  	  sdata2[tid].x += sdata2[tid + s].x;
-  	  //sdata2[tid].y += sdata2[tid + s].y;
-  	}
+	pad_sdata[tid] += pad_sdata[tid + s];
       __syncthreads();
     }
   
   /* write result of this block to global mem */
   if (tid == 0)
     {
-      //power2 = sdata1[0].x * sdata1[0].x + sdata1[0].y * sdata1[0].y +sdata2[0].x * sdata2[0].x + sdata2[0].y * sdata2[0].y;
-      //power2 = sdata1[0].x + sdata2[0].x;
-      //power  = sqrtf(power2);
-
-      power = (sdata1[0].x + sdata2[0].x)/(CUFFT_NX1 * NCHAN_KEEP2 / NCHAN_SEARCH)/(CUFFT_NX1 * NCHAN_KEEP2 / NCHAN_SEARCH);;
-      //power = (sdata1[0].x + sdata2[0].x)/(CUFFT_NX1 * CUFFT_NX1);;
+      power = pad_sdata[0]/(NPOL_SAMP * NDIM_POL * CUFFT_NX1 * NCHAN_KEEP2 / NCHAN_SEARCH)/(NPOL_SAMP * NDIM_POL * CUFFT_NX1 * NCHAN_KEEP2 / NCHAN_SEARCH);
       power2 = power * power;
 
-      //power = sdata1[0].x * sdata1[0].x + sdata1[0].y * sdata1[0].y +sdata2[0].x * sdata2[0].x + sdata2[0].y * sdata2[0].y;
-      //power2 = power * power;
       dbuf_rt1[blockIdx.y * gridDim.x + blockIdx.x].x = power;
       dbuf_rt1[blockIdx.y * gridDim.x + blockIdx.x].y = power2;
     }
