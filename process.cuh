@@ -61,8 +61,8 @@
 
 #define NCHAN_RATEI           1.107421875     // (NCHAN_KEEP1 * NCHK_NIC * NCHAN_CHK)/NCHAN_KEEP2
 #define NCHAN_FOLD            256             // Final number of channels for fold mode
-//#define NCHAN_SEARCH          1024            // Final number of channels for search mode
-#define NCHAN_SEARCH          512            // Final number of channels for search mode
+#define NCHAN_SEARCH          1024            // Final number of channels for search mode
+//#define NCHAN_SEARCH          512            // Final number of channels for search mode
 
 #define SCL_INT8              127.0f          // For int8_t, for fold mode
 #define SCL_UINT8             255.0f          // For uint8_t, for search mode

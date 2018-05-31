@@ -35,14 +35,13 @@ RECEIVER     PAF               # Frontend receiver
 FREQ         1340.5                   # centre frequency in MHz
 BW           303.407407             # bandwidth of in MHz (-ve lower sb)
 TSAMP        54.0               # sampling interval in microseconds
-#TSAMP        0.843750               # sampling interval in microseconds
 
 BYTES_PER_SECOND  18962962.96  # 1024 channels, 1 byte/sample, 2 samples in 108us
 NBIT         8                      # number of bits per sample
 NDIM         1                   # dimension of samples (2=complex, 1=real)
 NPOL         1                   # number of polarizations observed
-#NCHAN        1024                    # number of channels here
-NCHAN        512                    # number of channels here
+NCHAN        1024                    # number of channels here
+#NCHAN        512                    # number of channels here
 RESOLUTION   1          # a parameter that is unclear
 DSB          1
 # end of header
