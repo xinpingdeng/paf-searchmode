@@ -102,8 +102,8 @@ process_ndf        = int(ConfigSectionMap("ProcessConf")['stream_ndfstp'])
 process_nstream    = int(ConfigSectionMap("ProcessConf")['nstream'])
 process_osampratei = float(ConfigSectionMap("ProcessConf")['osamp_ratei'])
 process_nchanratei = float(ConfigSectionMap("ProcessConf")['nchan_ratei'])
-#process_rbufsz     = int(0.5 * diskdb_rbufsz * process_osampratei / process_nchanratei / 128.0)
-process_rbufsz     = int(0.5 * diskdb_rbufsz * process_osampratei / process_nchanratei / 64.0)
+process_nchanint   = float(ConfigSectionMap("ProcessConf")['nchan_int'])
+process_rbufsz     = int(0.5 * diskdb_rbufsz * process_osampratei / process_nchanratei / process_nchanint / 4)
 
 process_hfname     = ConfigSectionMap("ProcessConf")['hfname']
 process_cpu        = 1 

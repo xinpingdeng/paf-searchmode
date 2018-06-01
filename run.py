@@ -2,14 +2,17 @@
 
 import os
 
-script_name = "fold_file_fil.py"
-conf_fname  = "fold_file_fil.conf"
+# At current stage, if we want to change between modes, we need to update source code;
+# If we want to use different configuration, we need to update source code and also script configuration;
+
+#script_name = "fold_file_fil.py"
+#conf_fname  = "fold_file_fil.conf"
 
 #script_name = "fold_file.py"
 #conf_fname  = "fold_file.conf"
 
-#script_name = "process_fil_dump.py"
-#conf_fname  = "process_fil_dump.conf"
+script_name = "process_fil_dump.py"
+conf_fname  = "process_fil_dump.conf"
 dir_name    = "/beegfs/DENG/docker/"
 source_name = "J0332+5434"
 dada_fname  = "2018-04-17-19:22:11.56868_0000000000000000.000000.dada"
