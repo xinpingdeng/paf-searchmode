@@ -167,7 +167,7 @@ def main():
     os.system("dada_db -d -k {:s}".format(diskdb_key))
     os.system("dada_db -d -k {:s}".format(process_key))
     
-    os.system("mv *.ar {:s}".format(directory))
+    #os.system("mv *.ar {:s}".format(directory))
 
 if __name__ == "__main__":
     main()

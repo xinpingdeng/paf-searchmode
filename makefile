@@ -21,7 +21,6 @@ CU_FLAGS     = -Wno-deprecated-gpu-targets --default-stream per-thread #-arch=sm
 NVCC         = nvcc
 CC	     = gcc
 GXX          = g++
-TARGET       = paf_capture, 
 SRC_DIR      = .
 OBJ_DIR      = .
 
